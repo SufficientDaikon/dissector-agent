@@ -1,44 +1,67 @@
 #!/usr/bin/env bash
-# install.sh — Dissector Agent Installer for macOS/Linux
+# install.sh — Dissector Installer for macOS/Linux (Claude Code)
 # Run: chmod +x install.sh && ./install.sh
 
 set -e
 
 echo ""
-echo "🔬 Installing Dissector Agent..."
+echo "🔬 Installing Dissector (Claude Code multi-agent system)..."
 echo ""
 
 # Determine paths
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENTS_DIR="$HOME/.copilot/agents"
-SOURCE_FILE="$SCRIPT_DIR/agents/dissector.agent.md"
-DEST_FILE="$AGENTS_DIR/dissector.agent.md"
+CLAUDE_DIR="$HOME/.claude"
+AGENTS_SRC="$SCRIPT_DIR/.claude/agents"
+SKILLS_SRC="$SCRIPT_DIR/.claude/skills"
+COMMANDS_SRC="$SCRIPT_DIR/.claude/commands"
 
-# Verify source file exists
-if [ ! -f "$SOURCE_FILE" ]; then
-    echo "❌ Error: Source file not found at $SOURCE_FILE"
+# Verify source files exist
+if [ ! -d "$AGENTS_SRC" ] || [ ! -d "$SKILLS_SRC" ] || [ ! -d "$COMMANDS_SRC" ]; then
+    echo "❌ Error: .claude/ sources not found under $SCRIPT_DIR"
     echo "   Make sure you're running this from the dissector-agent repository root."
     exit 1
 fi
 
-# Create the agents directory if it doesn't exist
-if [ ! -d "$AGENTS_DIR" ]; then
-    mkdir -p "$AGENTS_DIR"
-    echo "✅ Created $AGENTS_DIR"
-else
-    echo "✅ Found existing $AGENTS_DIR"
+# Warn (don't fail) if the Claude Code CLI isn't on PATH
+if ! command -v claude >/dev/null 2>&1; then
+    echo "⚠️  Claude Code CLI ('claude') not found on PATH."
+    echo "   Install it first: https://code.claude.com/docs — the files will still be copied."
+    echo ""
 fi
 
-# Copy the agent file
-cp "$SOURCE_FILE" "$DEST_FILE"
-echo "✅ Copied dissector.agent.md to $AGENTS_DIR"
+mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/commands"
+
+# Copy agents
+for f in "$AGENTS_SRC"/*.md; do
+    cp "$f" "$CLAUDE_DIR/agents/$(basename "$f")"
+    echo "✅ Installed agent   $(basename "$f")"
+done
+
+# Copy skills (each skill is a directory)
+for d in "$SKILLS_SRC"/*/; do
+    name="$(basename "$d")"
+    mkdir -p "$CLAUDE_DIR/skills/$name"
+    cp "$d"SKILL.md "$CLAUDE_DIR/skills/$name/SKILL.md"
+    echo "✅ Installed skill   $name"
+done
+
+# Copy commands
+for f in "$COMMANDS_SRC"/*.md; do
+    cp "$f" "$CLAUDE_DIR/commands/$(basename "$f")"
+    echo "✅ Installed command /$(basename "$f" .md)"
+done
 
 echo ""
 echo "🎉 Installation complete!"
 echo ""
-echo "Installed files:"
-echo "  $DEST_FILE"
+echo "To use, open any Claude Code session and run:"
+echo "  /dissect /path/to/codebase"
 echo ""
-echo "To use: Open VS Code Copilot Chat and type:"
-echo '  @dissector Dissect /path/to/your/codebase'
+echo "Or launch a dedicated session:"
+echo "  claude --agent dissector"
+echo ""
+echo "To uninstall, remove:"
+echo "  $CLAUDE_DIR/agents/dissector.md and $CLAUDE_DIR/agents/dissection-*.md"
+echo "  $CLAUDE_DIR/skills/dissect and $CLAUDE_DIR/skills/dissection-standards"
+echo "  $CLAUDE_DIR/commands/dissect.md"
 echo ""
