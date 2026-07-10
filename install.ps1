@@ -37,11 +37,11 @@ Get-ChildItem -Path $agentsSrc -Filter *.md | ForEach-Object {
     Write-Host "✅ Installed agent   $($_.Name)" -ForegroundColor Green
 }
 
-# Copy skills (each skill is a directory)
+# Copy skills (each skill is a directory; copy it whole so bundled reference files survive)
 Get-ChildItem -Path $skillsSrc -Directory | ForEach-Object {
     $dest = Join-Path $claudeDir "skills\$($_.Name)"
-    New-Item -Path $dest -ItemType Directory -Force | Out-Null
-    Copy-Item -Path (Join-Path $_.FullName "SKILL.md") -Destination (Join-Path $dest "SKILL.md") -Force
+    if (Test-Path $dest) { Remove-Item -Path $dest -Recurse -Force }
+    Copy-Item -Path $_.FullName -Destination $dest -Recurse -Force
     Write-Host "✅ Installed skill   $($_.Name)" -ForegroundColor Green
 }
 

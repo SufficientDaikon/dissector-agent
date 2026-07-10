@@ -37,11 +37,11 @@ for f in "$AGENTS_SRC"/*.md; do
     echo "✅ Installed agent   $(basename "$f")"
 done
 
-# Copy skills (each skill is a directory)
+# Copy skills (each skill is a directory; copy it whole so bundled reference files survive)
 for d in "$SKILLS_SRC"/*/; do
     name="$(basename "$d")"
-    mkdir -p "$CLAUDE_DIR/skills/$name"
-    cp "$d"SKILL.md "$CLAUDE_DIR/skills/$name/SKILL.md"
+    rm -rf "$CLAUDE_DIR/skills/$name"
+    cp -R "$d" "$CLAUDE_DIR/skills/$name"
     echo "✅ Installed skill   $name"
 done
 
