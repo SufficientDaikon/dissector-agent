@@ -49,6 +49,7 @@ depends_on: [modules/src-ast]     # KB ids or "npm:pkg@ver" — type: module
 Body rules:
 - Terse declarative prose. No filler, no "as we can see", no marketing tone.
 - Structured inventories (dependency lists, env vars, endpoints, commands) go in fenced ` ```yaml ` blocks with stable keys, not prose or tables.
+- Fenced YAML blocks must be machine-parseable: no markdown formatting (backticks, bold, links) inside values; double-quote any string containing `` ` ``, `:`, `#`, `[`, `]`, or `{`. If you'd reach for inline code, quote the whole value instead.
 - Every fenced code block has a language tag. All paths use forward slashes.
 - **Determinism**: sort all lists lexicographically; keep section order fixed; never put timestamps, dates, or commit hashes in body content (volatile data lives only in `manifest.yaml`). Re-generating from unchanged sources must produce near-identical bytes.
 - **Size**: target 200–600 lines per file; hard cap 2,000. Split by module rather than exceed it.
