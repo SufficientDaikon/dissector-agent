@@ -54,6 +54,12 @@ Get-ChildItem -Path $commandsSrc -Filter *.md | ForEach-Object {
 Write-Host ""
 Write-Host "🎉 Installation complete!" -ForegroundColor Green
 Write-Host ""
+Write-Host "💡 Preferred install is now the Claude Code plugin (versioned, auto-update," -ForegroundColor White
+Write-Host "   ships the write-guard hook). From any Claude Code session:" -ForegroundColor White
+Write-Host "     /plugin marketplace add SufficientDaikon/dissector-agent" -ForegroundColor Yellow
+Write-Host "     /plugin install dissector@dissector-marketplace" -ForegroundColor Yellow
+Write-Host "   This script-copy install remains a fallback for offline/no-plugin setups." -ForegroundColor White
+Write-Host ""
 Write-Host "To use, open any Claude Code session and run:" -ForegroundColor White
 Write-Host "  /dissect C:\path\to\codebase" -ForegroundColor Yellow
 Write-Host ""
