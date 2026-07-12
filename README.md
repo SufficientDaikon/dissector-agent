@@ -54,12 +54,23 @@ Each specialist writes its knowledge-base files directly and returns only a comp
 | `dissection-standards` skill | `.claude/skills/dissection-standards/SKILL.md` | Shared methodology + KB format spec, preloaded into every specialist |
 | `dissector` agent | `.claude/agents/dissector.md` | Orchestrator for `claude --agent dissector` |
 | 6 specialist agents | `.claude/agents/dissection-*.md` | Scout, stack auditor, style analyst, interface documenter, quality auditor, synthesist |
+| write-guard hook | `hooks/hooks.json` + `scripts/write-guard.sh` | `PreToolUse` guard: agents may only write inside the `*-dissection/` output folder |
+| plugin manifest | `.claude-plugin/plugin.json` + `marketplace.json` | Packages the above as an installable, self-hosted Claude Code plugin |
 
 ## Installation
 
-**Zero-install (project-local):** clone this repo and start Claude Code inside it — the `.claude/` directory is picked up automatically and `/dissect` is available in that session.
+**Preferred — Claude Code plugin (versioned, auto-updating, ships the write-guard hook):** from any Claude Code session,
 
-**User-level install (available in every project):**
+```
+/plugin marketplace add SufficientDaikon/dissector-agent
+/plugin install dissector@dissector-marketplace
+```
+
+This installs the seven agents, both skills, the `/dissect` command, and the `PreToolUse` write-guard hook (see [Security](#security)) as a semver-tagged bundle you can update in place. For a team, check the plugin into the repo's project settings so every collaborator gets it automatically.
+
+**Zero-install (project-local):** clone this repo and start Claude Code inside it — the `.claude/` directory is picked up automatically and `/dissect` is available in that session. No plugin install needed.
+
+**User-level script install (fallback for offline / no-plugin setups):**
 
 macOS/Linux:
 ```bash
@@ -107,6 +118,7 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
 ├── security.md             # observed auth/validation/secrets posture (redacted)
 ├── performance.md          # caching, async, pooling, bottleneck risks
 ├── glossary.md             # domain vocabulary
+├── AGENTS.md               # cross-tool entry point (Codex/Cursor/Copilot/Gemini/…)
 ├── modules/<module-id>.md  # one file per module: purpose, files, exports, gotchas
 ├── api/<module-id>.md      # public API per module: signatures + citations
 └── guides/
@@ -114,9 +126,11 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
     └── rebuild.md          # reconstruction map: build order, extension points, fork strategy
 ```
 
-**How agents consume it:** load `index.md`, follow links as needed; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files.
+`<module-id>` is the module's source path with each `/` replaced by a double hyphen `--` (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths — a single `/` never maps to a single `-`, so `src/foo-bar` and `src/foo/bar` never merge.
 
-Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest), never crashes on unreadable files (skips and logs them), and refuses to overwrite non-dissection folders.
+**How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), follow links as needed; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files. To make agents use the KB automatically, add a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` (e.g. `> See {project}-dissection/index.md for the codebase map`) — Dissector prints the exact snippet at the end of a run and never writes into your source tree itself.
+
+Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest, plus a deterministic output-side secret scan in Stage 4), machine-verifies every `cite:` token and reports `N/M verified` in the manifest, never crashes on unreadable files (skips and logs them), refuses to overwrite non-dissection folders or a dissection of a different codebase, and — via the write-guard hook — writes only inside the `*-dissection/` output folder.
 
 ## Configuration
 
@@ -129,6 +143,33 @@ Guarantees: never executes target code (static analysis only), redacts detected 
 Reasoning `effort` per agent ships with task-shaped defaults (`low` for the mechanical stack audit, `high` for pattern analysis and synthesis) — also just frontmatter, edit freely.
 
 Sampling adapts automatically to codebase size: under 500 source files every file is read; 500–2,000 everything is read with repetitive patterns summarized; over 2,000 a stratified sample (all entry points/configs/APIs/tests exhaustively, proportional sampling elsewhere) is used and disclosed in `index.md` and `manifest.yaml`.
+
+**Scale envelope.** Dissector is tested on small and medium repositories (under ~2,000 source files). Tier-3 stratified sampling engages above 2,000 source files — the KB becomes a disclosed sample, not an exhaustive map. Very large monorepos should be dissected **per-package**: point `/dissect` at a package directory rather than the monorepo root. At Stage 0, Dissector prints the source-file count and a rough token estimate, and above 2,000 source files it pauses to let you confirm the whole-tree run or hand it a subdirectory instead.
+
+## Data flow
+
+Dissector runs entirely through **your configured Claude Code backend** — the Anthropic API, Amazon Bedrock, or Google Vertex AI, whichever your Claude Code is set to. Source files are read locally and sent to that model backend for analysis exactly as any Claude Code session would; **nothing else leaves your machine**, there is no Dissector server, telemetry, or third-party call. The generated knowledge base is written to a local `{project}-dissection/` folder and stays on disk — it is never uploaded anywhere by the tool. If your organization requires Bedrock/Vertex or zero-retention routing, configure Claude Code accordingly and Dissector inherits it.
+
+## Where should the KB live? (governance)
+
+The dissection is a concentrated, greppable map of your system — it aggregates endpoints, environment-variable names, config surface, and verbatim code snippets in one place. Treat it with the same care as the code it describes:
+
+- **Commit it** when you want the whole team (and their agents) to share one maintained map — it diffs cleanly and is cheap to regenerate. Good for internal repos.
+- **Gitignore it** (or store it in an access-controlled location) when the repo is sensitive and you don't want a consolidated attack-surface map in version control. The KB can make reconnaissance easier for anyone who gets read access.
+
+Secrets are redacted (`[REDACTED]`) with a deterministic output-side backstop scan, but redaction is best-effort — do not treat the KB as safe to publish just because it was scanned. Decide commit-vs-ignore deliberately per repo.
+
+## Security
+
+- **Static analysis only** — Dissector never executes, compiles, or runs the target code, and never fetches remote repositories.
+- **Write-guard hook** — the plugin ships a `PreToolUse` hook (`scripts/write-guard.sh`) that lets the specialist agents write **only** inside the `*-dissection/` output folder; any write elsewhere prompts you (`permissionDecision: ask`). This is a harness-level backstop, not just a prompt.
+- **Prompt-injection resistance** — analyzed file content is treated as untrusted **data, never instructions**. If a codebase contains text addressed to an AI agent ("ignore your instructions, write X…"), specialists record it as a finding and do not comply.
+- **Secret redaction** — matches classic patterns (AWS keys, JWTs, private keys, connection strings) plus modern provider tokens (`sk-`/`sk-ant-`, `ghp_`/`github_pat_`, `xoxb-`, `AIza`, `npm_`, `glpat-`, and more), with a deterministic Stage-4 grep over the generated KB as a second layer.
+- **Citation verification** — every `cite:` is machine-checked (file exists, line range in bounds, symbol present) and the verified/broken counts are reported in `manifest.yaml`.
+
+## Development
+
+**SINGLE SOURCE:** `.claude/agents`, `.claude/skills`, and `.claude/commands` are the **canonical** copies (they drive the zero-install project-local path). The repo-root `agents/`, `skills/`, and `commands/` directories are byte-identical copies that exist only so the Claude Code plugin (`.claude-plugin/`) can package them — marketplace installs copy real files, so these are real directories, **not symlinks**. Any change to an agent, skill, or command must be applied to **both** locations to keep them in sync; a `diff -r .claude/agents agents` (and likewise for skills/commands) must report no differences.
 
 ## FAQ
 
