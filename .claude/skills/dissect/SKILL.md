@@ -15,14 +15,18 @@ The output is an **agent-optimized knowledge base**: a `{PROJECT_NAME}-dissectio
 
 If the Agent tool is unavailable in your session (you were spawned as a subagent), stop and tell the user to run `/dissect <path>` from their main session — do not attempt a single-context dissection.
 
+**Shell portability.** Every Bash command in Stage 0 and Stage 4 is POSIX-bash — the Claude Code Bash tool provides bash on Windows too (via the bundled git-bash), so bash syntax is safe on all platforms. Avoid GNU-only flags. Where a common tool differs across platforms (e.g. `sha256sum` is absent on stock macOS), use the portable fallback form shown below.
+
+**Scale envelope.** Dissector is tested on small and medium repositories (under ~2,000 source files). Tier-3 stratified sampling engages above 2,000 source files. Very large monorepos should be dissected per-package — point `/dissect` at a package directory rather than the monorepo root. Stage 0 counts files and, above the 2,000-source-file threshold, asks the user to confirm or narrow scope.
+
 ## Stage 0 — Preflight (yourself, no subagents)
 
-1. **Parse the path** from the invocation. Expand `~`; accept `/` or `\` and normalize to `/`; quote paths with spaces in all commands. If no path was given and the user plainly means the current project, use the current working directory; otherwise ask for a path.
+1. **Parse the path** from the invocation. Expand `~`; accept `/` or `\` and normalize to `/`; quote paths with spaces in all commands. If no path was given and the user plainly means the current project, use the current working directory; otherwise ask for a path. Store it as the shell variable `TARGET_PATH` (never name it `PATH` — that clobbers the executable search path and breaks every later command).
 2. **Validate** (Bash, in order, stop at first failure — print the exact message and HALT without creating anything):
-   - `[ -e "$PATH" ]` fails → `❌ Error: Path '{path}' does not exist. Please provide a valid filesystem path to a codebase directory.`
-   - `[ -d "$PATH" ]` fails → `❌ Error: '{path}' is a file, not a directory. Please provide the root directory of the codebase.`
-   - `find "$PATH" -type f | head -1` empty → `❌ Error: '{path}' is an empty directory. No files found to analyze.`
-   - Store the absolute normalized path as `CODEBASE_PATH`.
+   - `[ -e "$TARGET_PATH" ]` fails → `❌ Error: Path '{path}' does not exist. Please provide a valid filesystem path to a codebase directory.`
+   - `[ -d "$TARGET_PATH" ]` fails → `❌ Error: '{path}' is a file, not a directory. Please provide the root directory of the codebase.`
+   - `find "$TARGET_PATH" -type f | head -1` empty → `❌ Error: '{path}' is an empty directory. No files found to analyze.`
+   - Store the absolute normalized path (resolved via `realpath` / `cd … && pwd`) as `CODEBASE_PATH`.
 3. **Resolve `PROJECT_NAME`** — first match wins:
    1. `package.json` → `"name"`
    2. `Cargo.toml` → `[package] name`
@@ -34,10 +38,37 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
    8. Fallback: leaf directory name of `CODEBASE_PATH`
 
    Sanitize: trim; replace `< > : " | ? *` and `/` with `-`; strip a leading `@scope-` if it makes the name unwieldy; empty → `unknown-project`. If multiple manifests exist, use the first per precedence and record the conflict for the synthesist. If the output path would exceed 260 chars, truncate the name to fit.
-4. **Idempotency**: `OUTPUT_FOLDER = "{PROJECT_NAME}-dissection"` in the CWD; `OUTPUT_PATH` = its absolute path.
-   - Exists with `manifest.yaml` inside → print `⚠️ Previous dissection found at "{OUTPUT_PATH}". Overwriting...`, `rm -rf` it, proceed.
-   - Exists WITHOUT `manifest.yaml` → print `❌ Error: A folder named "{OUTPUT_FOLDER}" already exists but is not a previous dissection (no manifest.yaml marker). Cannot overwrite.` and `💡 Suggestion: Rename the existing folder or run from a different working directory.` → HALT.
-5. `mkdir -p "$OUTPUT_PATH/modules" "$OUTPUT_PATH/api" "$OUTPUT_PATH/guides"` so parallel specialists never race on directories.
+4. **Scale check** (Bash): count source files (post-exclusion; a `find` that prunes the standard exclude dirs and `*-dissection` is fine) and print a scale line:
+   ```
+   📊 {SOURCE_FILES} source files (~{TOTAL_FILES} total). Rough token estimate: ~{SOURCE_FILES × 400} tokens of source at Tier 1.
+   ```
+   (The 400-tokens-per-file figure is a coarse average; it is only a rough order-of-magnitude estimate, state it as such.) If `SOURCE_FILES > 2000`, do NOT proceed automatically — print:
+   ```
+   ⚠️ This codebase has {SOURCE_FILES} source files, above Dissector's tested envelope (~2,000). Tier-3 stratified sampling will engage, so the KB will be a sample, not exhaustive. For a monorepo, consider pointing /dissect at a single package directory instead. Reply "continue" to dissect the whole tree at Tier 3, or give me a subdirectory path.
+   ```
+   and wait for the user's decision before continuing.
+5. **Git commit sample** (Bash): if `CODEBASE_PATH` is a git work tree (`git -C "$CODEBASE_PATH" rev-parse --is-inside-work-tree` succeeds), capture `git -C "$CODEBASE_PATH" log --oneline -20` subjects into `GIT_COMMIT_SAMPLE` (a short newline-joined list). The synthesist has no Bash, so it cannot sample git itself — you pass this in. If not a git tree, `GIT_COMMIT_SAMPLE` is empty.
+6. **Idempotency & safe overwrite**: `OUTPUT_FOLDER = "{PROJECT_NAME}-dissection"` in the CWD; `OUTPUT_PATH` = its absolute path (`"$PWD/$OUTPUT_FOLDER"`).
+   - **Folder does not exist** → proceed to step 7.
+   - **Folder exists WITHOUT `manifest.yaml`** → print `❌ Error: A folder named "{OUTPUT_FOLDER}" already exists but is not a previous dissection (no manifest.yaml marker). Cannot overwrite.` and `💡 Suggestion: Rename the existing folder or run from a different working directory.` → HALT.
+   - **Folder exists WITH `manifest.yaml`** → run the safe-overwrite gate before any deletion, ALL of the following must pass:
+     1. **Generator marker**: parse `OUTPUT_PATH/manifest.yaml` and require `generator.name: dissector`. If absent/different → refuse: `❌ Error: "{OUTPUT_FOLDER}" contains a manifest.yaml not written by Dissector (generator.name is not "dissector"). Refusing to delete it.` → HALT. (A stub manifest written in step 8 of a prior interrupted run also carries `generator.name: dissector` with `status.complete: false` — that IS a resumable/overwritable previous dissection, so it passes this gate.)
+     2. **Provenance match**: read `generated_from.path` from that manifest. If it is present and does NOT resolve to the same path as `CODEBASE_PATH`, refuse: `❌ Error: "{OUTPUT_FOLDER}" is a dissection of a DIFFERENT codebase ({other_path}), not {CODEBASE_PATH}. Refusing to overwrite it — rename it or run elsewhere.` → HALT. (A stub with no `generated_from.path` yet is allowed.)
+     3. **Realpath assertion**: compute `realpath "$OUTPUT_PATH"` and assert it equals exactly `"$PWD/$OUTPUT_FOLDER"` (same parent = current working directory, same leaf name). If it is a symlink or resolves elsewhere, refuse: `❌ Error: "{OUTPUT_FOLDER}" does not resolve to a folder directly inside the current directory. Refusing to delete {resolved}.` → HALT.
+   - Only when all three pass: print `⚠️ Previous dissection found at "{OUTPUT_PATH}". Overwriting...`, then `rm -rf "$OUTPUT_PATH"` and proceed.
+7. **Concurrency lock**: after the overwrite gate but before recreating the folder, check for a stale lock from another run. If `OUTPUT_PATH/.dissect-lock` exists and its timestamp is younger than 2 hours (`find "$OUTPUT_PATH/.dissect-lock" -mmin -120` non-empty, or compare the stored epoch to `date +%s`), refuse: `❌ Error: Another dissection of "{PROJECT_NAME}" appears to be running (lock at {OUTPUT_PATH}/.dissect-lock, < 2h old). Wait for it to finish or delete the lock if it is stale.` → HALT. (If overwrite in step 6 already deleted the folder, there is no lock; only a folder that survived — e.g. same-target resume — can carry one.)
+8. **Create folder, stub manifest, and lock**:
+   - `mkdir -p "$OUTPUT_PATH/modules" "$OUTPUT_PATH/api" "$OUTPUT_PATH/guides"` so parallel specialists never race on directories.
+   - Immediately write a **stub `OUTPUT_PATH/manifest.yaml`** so an interrupted run is recognizable and overwritable next time (Stage 4 overwrites it with the full manifest):
+     ```yaml
+     schema_version: "1.0"
+     generator: {name: dissector, version: 2.1.0}
+     generated_from:
+       path: <CODEBASE_PATH>
+     status: {complete: false, phases_completed: 0}
+     ```
+   - Write the lock: `date +%s > "$OUTPUT_PATH/.dissect-lock"`.
+9. **Output self-exclusion in a git work tree**: if `CODEBASE_PATH` is a git work tree AND `OUTPUT_PATH` is inside it (the user ran `/dissect .` and the CWD is the repo), append the output folder to `.git/info/exclude` so the generated KB never pollutes `git status`: `printf '%s\n' "$OUTPUT_FOLDER/" >> "$CODEBASE_PATH/.git/info/exclude"` (only if not already present). This is local-only and reversible; never edit the tracked `.gitignore`.
 
 ## Stage 1 — Scout
 
@@ -48,9 +79,12 @@ Spawn `dissection-scout` with a prompt containing exactly:
 CODEBASE_PATH: <path>
 OUTPUT_PATH: <path>
 PROJECT_NAME: <name>
+EXCLUDE_FROM_ANALYSIS: <OUTPUT_PATH> (the dissection output folder — never read or count files under it)
 Run your full Phase 1-2 analysis, write your KB files, and return the Recon Brief plus manifest.
 ```
-Keep its returned `recon_brief` and `manifest` verbatim — you will paste the brief into every later prompt.
+Validate the returned manifest (see **Manifest validation** below) and keep its returned `recon_brief` and `manifest` verbatim — you will paste the brief into every later prompt.
+
+**Scout failure handling**: if the scout errors or returns no/invalid manifest, retry it ONCE. If it fails again, **HALT the entire run** with: `❌ Error: The scout failed to produce a Recon Brief after a retry. Nothing downstream can run without it. Please re-run /dissect; if it persists, the codebase structure may be unreadable.` Remove the lock (`rm -f "$OUTPUT_PATH/.dissect-lock"`) before halting. The Recon Brief is a hard dependency for every other stage — there is no partial path around it.
 
 ## Stage 2 — Parallel fan-out
 
@@ -61,25 +95,40 @@ Spawn ALL FOUR in a SINGLE message (four Agent calls at once): `dissection-stack
 CODEBASE_PATH: <path>
 OUTPUT_PATH: <path>
 PROJECT_NAME: <name>
+EXCLUDE_FROM_ANALYSIS: <OUTPUT_PATH> (the dissection output folder — never read or count files under it)
 <the full recon_brief YAML block>
 Run your phases, write your KB files, and return your manifest.
 ```
-Collect the four manifests. If a specialist fails (error or no manifest), retry it once; if it fails again, record it as partial and continue.
+Collect the four manifests. Validate each (see below). If a specialist fails (error, no manifest, or a manifest still malformed after the bounce-back), retry it once; if it fails again, record it as partial and continue.
 
 ## Stage 3 — Synthesist
 
 Print `[Phase 12/13] Synthesis — guides, glossary, index...`
 
-Spawn `dissection-synthesist` with CODEBASE_PATH / OUTPUT_PATH / PROJECT_NAME, the recon_brief, and ALL FIVE manifests (scout + four). Tell it which files are missing/partial so index.md carries the completion checklist.
+Spawn `dissection-synthesist` with a prompt containing CODEBASE_PATH / OUTPUT_PATH / PROJECT_NAME, the `EXCLUDE_FROM_ANALYSIS` line, the recon_brief, ALL FIVE manifests (scout + four), the `GIT_COMMIT_SAMPLE` block captured in Stage 0, and a note of which files are missing/partial so index.md carries the completion checklist. Include:
+```
+GIT_COMMIT_SAMPLE: |
+  <the up-to-20 commit subject lines, or "none — not a git work tree">
+```
+
+**Synthesist failure handling**: validate its manifest. If it errors or returns an invalid manifest, retry ONCE. If it fails again, do NOT halt — mark the run partial (`status.complete: false`, add the synthesist's files to `partial_files`), and in the completion summary tell the user: `⚠️ Synthesis (index, glossary, guides) failed. The per-domain KB files are present; re-run /dissect to regenerate the cross-cutting files.` The KB is still usable without the synthesized index.
+
+## Manifest validation (applies to every specialist manifest)
+
+Before using any returned manifest, validate it has all required keys: `agent`, `phases`, `status`, `files_written`, `key_findings`. `files_written` must be a list of `{path, covers}`; `status` must be `complete` or `partial`. If a manifest is malformed (missing keys, wrong shape), **re-spawn that specialist ONCE** with a bounce-back note quoting exactly what was wrong, e.g.:
+```
+Your previous manifest was rejected: <the specific problem, e.g. "missing required key 'files_written'" or "status was 'done', must be 'complete' or 'partial'">. Re-emit ONLY the manifest block per dissection-standards §7, correctly structured.
+```
+If the re-spawn is still malformed, treat the specialist as failed (Stage 2 partial protocol; Stage 1/3 per their halt/partial rules above).
 
 ## Stage 4 — Finalize (yourself)
 
 Print `[Phase 13/13] Output — manifest, verification, summary...`
 
-1. **Write `OUTPUT_PATH/manifest.yaml`** — aggregate from the manifests:
+1. **Write `OUTPUT_PATH/manifest.yaml`** — aggregate from the manifests, overwriting the Stage 0 stub:
 ```yaml
 schema_version: "1.0"
-generator: {name: dissector, version: 2.0.0}
+generator: {name: dissector, version: 2.1.0}
 generated_from:
   path: <CODEBASE_PATH>
   commit: <git -C CODEBASE_PATH rev-parse HEAD, or null>
@@ -93,16 +142,27 @@ status:
   complete: true|false
   phases_completed: <N of 13>
   partial_files: []
-  secrets_redacted: true|false      # OR of all manifests
+  secrets_redacted: true|false      # OR of all manifests AND the Stage-4 backstop below
   skipped_files: []                  # union of all manifests
+citations:                           # filled in step 4
+  total: 0
+  verified: 0
+  broken: []
 entries:                             # sorted by id; one per KB file from files_written
   - id: <path minus .md>
     covers: [<globs from the owning manifest>]
     source_hashes: {}                # filled in step 2
 ```
-2. **Source hashes** (one Bash pass): for every distinct source file matched by the `covers` globs — or, simpler and acceptable, every source file the scout counted — compute `sha256sum | cut -c1-8` and fill `source_hashes` per entry (files matching that entry's `covers`). If the codebase is very large (>2,000 files), hash only entry-point/config/API files plus per-entry sampled files and note `source_hashes_partial: true`.
-3. **Verify**: every `files_written` path exists; extract relative markdown links from each KB file and `test -e` them from the file's directory; index.md < 200 lines. Fix trivial breaks yourself (a missing link target = ask the synthesist? No — remove or correct the link); anything structural goes to `status.partial_files`.
-4. **Print the completion summary**:
+2. **Source hashes** (one Bash pass): for every distinct source file matched by the `covers` globs — or, simpler and acceptable, every source file the scout counted — compute a portable SHA-256 and take the first 8 hex chars. Use the portable fallback (`sha256sum` is absent on stock macOS):
+   ```bash
+   hash_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -c1-8; else shasum -a 256 "$1" | cut -c1-8; fi; }
+   ```
+   Fill `source_hashes` per entry (files matching that entry's `covers`). If the codebase is very large (>2,000 files), hash only entry-point/config/API files plus per-entry sampled files and note `source_hashes_partial: true`.
+3. **Output-side secret backstop** (one Bash grep pass over the generated KB — a deterministic safety net independent of what the specialists redacted): grep every `OUTPUT_PATH/**/*.md` for the modern token patterns (see dissection-standards §5): `sk-`, `sk-ant-`, `ghp_`, `gho_`, `ghs_`, `github_pat_`, `xoxb-`, `xoxp-`, `xoxs-`, `AIza`, `npm_`, `glpat-`, `pypi-AgEIcHlwaS5vcmc`, `dop_v1_`, `shpat_`, `shpss_`, plus `AKIA[A-Z0-9]{16}`, `-----BEGIN [A-Z ]*PRIVATE KEY-----`, and JWT `eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*`. Any hit that is not an obvious placeholder → replace the matched value with `[REDACTED]` in that KB file (sed in place), set `status.secrets_redacted: true`, and report each redaction location in the summary. This catches secrets a specialist echoed into a snippet.
+4. **Citation verification pass** (deterministic, no LLM): scan every `cite:` token across all `OUTPUT_PATH/**/*.md`. Each token has the form `cite: <relpath>#L<start>-L<end> symbol: <name>` (symbol optional). For each: (a) `test -e "$CODEBASE_PATH/<relpath>"` — file exists; (b) `<end>` ≤ the file's line count (`wc -l`); (c) if a `symbol:` is given, `sed -n "<start>,<end>p"` of the file greps for the symbol name. A bash loop with `sed`/`grep` does all three. Record `citations.total` (tokens seen), `citations.verified` (tokens passing all checks), and `citations.broken` (list of `{cite, reason}` for failures). Broken cites are REPORTED, not silently dropped — leave the KB text as the specialist wrote it (the specialists self-verify per standards §4; this pass is the backstop and the trust metric).
+5. **Verify structure**: every `files_written` path exists; extract relative markdown links from each KB file and `test -e` them from the file's directory; index.md < 200 lines. Fix trivial breaks yourself (a broken link target → remove or correct the link); anything structural goes to `status.partial_files`.
+6. **Remove the lock**: `rm -f "$OUTPUT_PATH/.dissect-lock"`.
+7. **Print the completion summary**:
 ```
 ✅ Dissection complete!
 
@@ -111,10 +171,18 @@ entries:                             # sorted by id; one per KB file from files_
 🗣️ Languages: {LANGUAGE_LIST}
 📝 KB files generated: {COUNT}
 📐 Sampling: tier {N}
+🔗 Citations: {VERIFIED}/{TOTAL} verified{, N broken (see manifest.yaml) if any}
+🔒 Secrets: {redacted N values | none detected}
 ⏱️ Phases completed: {N}/13
 🤖 Agents: point any agent at {OUTPUT_PATH}/index.md to load the codebase map.
+```
+   Then tell the user how to wire the KB into their tools: the synthesist wrote `{OUTPUT_PATH}/AGENTS.md` as a cross-tool entry point. Offer the exact one-line snippet they can add to their repo's `CLAUDE.md` / `AGENTS.md` (do NOT write into the analyzed repo yourself):
+```
+💡 To make agents use this automatically, add one line to your repo's CLAUDE.md or AGENTS.md:
+   > See {OUTPUT_FOLDER}/index.md for the dissected codebase map (architecture, APIs, conventions).
+   Or copy {OUTPUT_FOLDER}/AGENTS.md into your repo root as a cross-tool entry point.
 ```
 
 ## Partial-run protocol
 
-Never abort the whole run for one failed specialist. Mark what's missing (`status.complete: false`, `phases_completed` < 13, `partial_files` listing missing KB files), make sure the synthesist added the completion checklist to index.md, and tell the user which specialist to re-run. Determinism: same codebase state in, same structure/facts out — phrasing may vary, facts and citations may not.
+Never abort the whole run for one failed specialist (the sole exception is a scout that fails twice — see Stage 1). Mark what's missing (`status.complete: false`, `phases_completed` < 13, `partial_files` listing missing KB files), make sure the synthesist added the completion checklist to index.md, and tell the user which specialist to re-run. Always remove the lock before returning, even on a partial or halted run. Determinism: same codebase state in, same structure/facts out — phrasing may vary, facts and citations may not.
