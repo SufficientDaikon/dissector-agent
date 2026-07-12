@@ -3,6 +3,10 @@
 # Run: chmod +x install.sh && ./install.sh
 
 set -e
+# Guard the copy loops against an empty glob under `set -e`: with nullglob a
+# non-matching *.md / */ pattern expands to nothing (loop body skipped) instead
+# of iterating the literal pattern.
+shopt -s nullglob
 
 echo ""
 echo "🔬 Installing Dissector (Claude Code multi-agent system)..."

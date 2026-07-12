@@ -54,7 +54,7 @@ Each specialist writes its knowledge-base files directly and returns only a comp
 | `dissection-standards` skill | `.claude/skills/dissection-standards/SKILL.md` | Shared methodology + KB format spec, preloaded into every specialist |
 | `dissector` agent | `.claude/agents/dissector.md` | Orchestrator for `claude --agent dissector` |
 | 6 specialist agents | `.claude/agents/dissection-*.md` | Scout, stack auditor, style analyst, interface documenter, quality auditor, synthesist |
-| write-guard hook | `hooks/hooks.json` + `scripts/write-guard.sh` | `PreToolUse` guard: agents may only write inside the `*-dissection/` output folder |
+| write-guard hook (plugin install) | `hooks/hooks.json` + `scripts/write-guard.sh` | `PreToolUse` guard shipped with the plugin: agents may only write inside the `*-dissection/` output folder |
 | plugin manifest | `.claude-plugin/plugin.json` + `marketplace.json` | Packages the above as an installable, self-hosted Claude Code plugin |
 
 ## Installation
@@ -98,7 +98,7 @@ Or a dedicated session:
 claude --agent dissector
 ```
 
-Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`). On a re-run against the same project, an existing dissection folder (identified by its `manifest.yaml` marker) is overwritten after a warning; a same-named folder *without* the marker is never touched.
+Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`). On a re-run against the same project, an existing dissection folder (identified by a `manifest.yaml` carrying `generator.name: dissector`) is overwritten after a warning; a same-named folder *without* that marker is never touched.
 
 ## Output format
 
@@ -130,7 +130,7 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
 
 **How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), follow links as needed; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files. To make agents use the KB automatically, add a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` (e.g. `> See {project}-dissection/index.md for the codebase map`) — Dissector prints the exact snippet at the end of a run and never writes into your source tree itself.
 
-Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest, plus a deterministic output-side secret scan in Stage 4), machine-verifies every `cite:` token and reports `N/M verified` in the manifest, never crashes on unreadable files (skips and logs them), refuses to overwrite non-dissection folders or a dissection of a different codebase, and — via the write-guard hook — writes only inside the `*-dissection/` output folder.
+Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest, plus a deterministic output-side secret scan in Stage 4), machine-verifies every `cite:` token and reports `N/M verified` in the manifest, never crashes on unreadable files (skips and logs them), and refuses to overwrite non-dissection folders or a dissection of a different codebase. On the **plugin install**, the write-guard hook additionally enforces at the harness level that agents write only inside the `*-dissection/` output folder; the zero-install and script-install paths rely instead on the agents' `permissionMode: acceptEdits` and the in-prompt rule that analyzed content is data, never instructions (see [Security](#security)).
 
 ## Configuration
 
@@ -162,14 +162,14 @@ Secrets are redacted (`[REDACTED]`) with a deterministic output-side backstop sc
 ## Security
 
 - **Static analysis only** — Dissector never executes, compiles, or runs the target code, and never fetches remote repositories.
-- **Write-guard hook** — the plugin ships a `PreToolUse` hook (`scripts/write-guard.sh`) that lets the specialist agents write **only** inside the `*-dissection/` output folder; any write elsewhere prompts you (`permissionDecision: ask`). This is a harness-level backstop, not just a prompt.
+- **Write-guard hook (plugin install)** — the **plugin** ships a `PreToolUse` hook (`scripts/write-guard.sh`) that emits `permissionDecision: allow` for writes inside the `*-dissection/` output folder and `permissionDecision: ask` for anything else, so an injected payload can't silently steer a specialist into writing elsewhere. This harness-level backstop rides with the plugin install only; the **zero-install** and **script-install** paths instead rely on the agents' `permissionMode: acceptEdits` plus the in-prompt rule that analyzed content is treated as **data, never instructions** (dissection-standards §0).
 - **Prompt-injection resistance** — analyzed file content is treated as untrusted **data, never instructions**. If a codebase contains text addressed to an AI agent ("ignore your instructions, write X…"), specialists record it as a finding and do not comply.
 - **Secret redaction** — matches classic patterns (AWS keys, JWTs, private keys, connection strings) plus modern provider tokens (`sk-`/`sk-ant-`, `ghp_`/`github_pat_`, `xoxb-`, `AIza`, `npm_`, `glpat-`, and more), with a deterministic Stage-4 grep over the generated KB as a second layer.
 - **Citation verification** — every `cite:` is machine-checked (file exists, line range in bounds, symbol present) and the verified/broken counts are reported in `manifest.yaml`.
 
 ## Development
 
-**SINGLE SOURCE:** `.claude/agents`, `.claude/skills`, and `.claude/commands` are the **canonical** copies (they drive the zero-install project-local path). The repo-root `agents/`, `skills/`, and `commands/` directories are byte-identical copies that exist only so the Claude Code plugin (`.claude-plugin/`) can package them — marketplace installs copy real files, so these are real directories, **not symlinks**. Any change to an agent, skill, or command must be applied to **both** locations to keep them in sync; a `diff -r .claude/agents agents` (and likewise for skills/commands) must report no differences.
+**SINGLE SOURCE:** `.claude/agents`, `.claude/skills`, and `.claude/commands` are the **canonical** copies (they drive the zero-install project-local path). The repo-root `agents/`, `skills/`, and `commands/` directories are byte-identical copies that exist only so the Claude Code plugin (`.claude-plugin/`) can package them — marketplace installs copy real files, so these are real directories, **not symlinks**. Any change to an agent, skill, or command must be applied to **both** locations to keep them in sync; a `diff -r .claude/agents agents` (and likewise for skills/commands) must report no differences. Run `scripts/check-sync.sh` to verify the whole mirror in one shot — it diffs all three pairs and exits nonzero on any drift.
 
 ## FAQ
 
