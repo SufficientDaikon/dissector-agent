@@ -43,7 +43,7 @@ Your prompt provides `CODEBASE_PATH`, `OUTPUT_PATH`, `PROJECT_NAME`, and `EXCLUD
 
 ## Return: the Recon Brief
 
-Return EXACTLY this (it is pasted into every downstream specialist's prompt), followed by the standard manifest from dissection-standards §7:
+Return **two separate top-level YAML blocks** — never merged into one. First the `recon_brief:` block below (it is pasted into every downstream specialist's prompt), then the `manifest:` block from dissection-standards §7. They are different structures with different keys; do not rename `manifest:` to `dissection_manifest` or fold the brief into it.
 
 ```yaml
 recon_brief:
@@ -61,3 +61,11 @@ recon_brief:
   architecture_patterns: [{name: <pattern>, confidence: high|medium|low}]
   extra_exclusions: []        # additional patterns from .gitignore
 ```
+
+## Output contract — confirm before you return (non-negotiable)
+
+The KB's whole value is its machine format. These are the most-missed rules — verify all three before your final message:
+
+1. **Cites.** Every factual claim in `architecture.md` and each `modules/*.md` carries a `cite:` token — own-line `cite: <relpath>#Lstart-Lend symbol: <name>`. NEVER the inline shorthand `path:line` (e.g. `src/requests/sessions.py:1-8` or `pyproject.toml:17`): it lacks the `cite:` prefix and `#L`, so the verifier and consuming agents cannot see it. Convert every such reference to a real cite.
+2. **Frontmatter.** Every file you write has `type`, `id`, `title`, and `description`.
+3. **Two return blocks.** `recon_brief:` first, then a separate `manifest:` block (§7) as your final message — top key literally `manifest:`, `phases: [1, 2]`, `files_written` a list of `{path, covers}` with OUTPUT_PATH-relative paths (`architecture.md`, `modules/src--foo.md`). Do NOT write the manifest to a file.

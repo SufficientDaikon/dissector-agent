@@ -65,4 +65,8 @@ A short `AGENTS.md` **inside OUTPUT_PATH** (never write into the analyzed repo) 
 4. One line: "Every factual claim carries a `cite:` token pointing to `path#Lstart-Lend` in the source; grep them to jump to code."
 5. One line telling a human they can copy this file to their repo root or reference `{OUTPUT_FOLDER}/index.md` from their existing CLAUDE.md/AGENTS.md.
 
-Verify every relative link you write resolves to a file that exists. End with the standard manifest (dissection-standards §7); list `AGENTS.md` in `files_written`.
+Verify every relative link you write resolves to a file that exists.
+
+## Output contract — confirm before you return (non-negotiable)
+
+Verify before your final message: (1) every recipe step, glossary term, and rebuild claim that points at code carries a `cite:` token — own-line `cite: <relpath>#Lstart-Lend symbol: <name>`, never the inline `path:line` shorthand. (2) Every KB file you write (`index.md`, `glossary.md`, `guides/*.md`) has `type`, `id`, `title`, `description`; `AGENTS.md` is the sole exception (plain Markdown, no frontmatter, by design). (3) Return the `manifest:` block (§7) as your FINAL message — literal `manifest:` key, `phases: [12]`, `files_written` as `{path, covers}` listing `AGENTS.md`, never written to a separate file.

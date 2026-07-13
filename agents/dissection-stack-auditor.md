@@ -45,4 +45,10 @@ Per dependency: category (runtime/dev/optional/peer), version constraint, purpos
 - `OUTPUT_PATH/dependencies.md` — `type: domain`, `id: dependencies`. Fenced YAML: `dependencies: [{name, version, category, purpose, used_in}]` (sorted by name), then `version_strategy:` and `notable:` sections.
 - `OUTPUT_PATH/build-and-test.md` — `type: domain`, `id: build-and-test`. The operational facts an agent needs to work on this repo: fenced YAML `commands: [{cmd, purpose, when}]`, `ci_pipelines: [{name, file, triggers, jobs}]`, `deployment: []`, `env_vars: [{name, purpose, required, default}]`, with cites.
 
-End with the standard manifest (dissection-standards §7).
+## Output contract — confirm before you return (non-negotiable)
+
+The KB's whole value is its machine format. These are the most-missed rules — verify all three before your final message:
+
+1. **Cites.** Every factual claim in `tech-stack.md`, `dependencies.md`, and `build-and-test.md` carries a `cite:` token pointing at the config/manifest it came from — own-line `cite: <relpath>#Lstart-Lend symbol: <name>` in prose, or a `cite: "<relpath>#Lstart-Lend"` field as the last key inside a fenced YAML record (natural here, since your content is mostly YAML inventories). NEVER the inline shorthand `path:line` (e.g. `pyproject.toml:18`): it lacks the `cite:` prefix and `#L`, so the verifier and consuming agents cannot see it. Every dependency, command, and env-var row should carry a `cite:` field.
+2. **Frontmatter.** Every file you write has `type`, `id`, `title`, and `description`.
+3. **Manifest.** Return the `manifest:` block (§7) as your FINAL message — top key literally `manifest:`, `phases: [3, 10, 11]`, `files_written` a list of `{path, covers}` with OUTPUT_PATH-relative paths. Do NOT write the manifest to a file, and do NOT return a prose summary in its place.
