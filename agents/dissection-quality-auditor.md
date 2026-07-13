@@ -53,6 +53,10 @@ Performance:
 - `OUTPUT_PATH/security.md` — `type: domain`, `id: security`. Fenced YAML `security: {authentication: [], authorization: [], validation: [], secrets_management: [], headers: [], sanitization: []}` with cites; note `Secrets were detected and redacted from output` when applicable.
 - `OUTPUT_PATH/performance.md` — `type: domain`, `id: performance`. Fenced YAML `performance: {caching: [], lazy_loading: [], query_optimization: [], async_patterns: [], pooling: [], bottleneck_risks: []}` with cites.
 
+## Concept cross-references (standards §3a)
+
+Give each of `testing.md`, `security.md`, `performance.md` a sorted `related:` frontmatter list and a closing `## Related` markdown-link section: `testing.md` → `build-and-test` and `guides/extend`; `security.md` → `dependencies` and `build-and-test`; `performance.md` → `architecture` and `patterns`. Root-level links are bare filenames; to a guide write `guides/extend.md`. Verify each resolves before you return.
+
 ## Output contract — confirm before you return (non-negotiable)
 
 The KB's whole value is its machine format. These are the most-missed rules — verify all three before your final message:

@@ -49,7 +49,7 @@ Domain-specific terms (not general programming terms) from identifiers, comments
 The root of the KB, <200 lines, llms.txt-style. Structure:
 
 1. H1 `{PROJECT_NAME} — dissection` + blockquote: what the project is (one paragraph, inferred) and what this KB is.
-2. **Reading order for agents**: one line — "load this file, then follow links as needed; grep `cite:` tokens to jump to source; see manifest.yaml for coverage and staleness data."
+2. **Reading order for agents**: one line — "load this file, then hop between concepts via each file's `## Related` links (the KB is a graph, not just this hub); grep `cite:` tokens to jump to source; see manifest.yaml for coverage and staleness data."
 3. **Quick facts** (fenced YAML): primary language, module count, entry points, sampling tier, counts.
 4. H2 sections mirroring the KB layout — Structure / Interfaces / Practices / Guides — each a bullet list of `[title](relative-path) — one-line description` for EVERY KB file, including every `modules/*` and `api/*` file.
 5. If any manifest reported `status: partial`: an H2 `Completion status` section with a checklist of complete/missing files and the line `This dissection is PARTIAL — re-run /dissect to complete.`
@@ -66,6 +66,10 @@ A short `AGENTS.md` **inside OUTPUT_PATH** (never write into the analyzed repo) 
 5. One line telling a human they can copy this file to their repo root or reference `{OUTPUT_FOLDER}/index.md` from their existing CLAUDE.md/AGENTS.md.
 
 Verify every relative link you write resolves to a file that exists.
+
+## Concept cross-references (standards §3a)
+
+Give `glossary.md` and both guides a sorted `related:` frontmatter list and a closing `## Related` markdown-link section: `glossary.md` → `architecture`; `guides/extend.md` → `conventions`, `patterns`, `testing`, `build-and-test`; `guides/rebuild.md` → `architecture` and `guides/extend`. `index.md` is exempt from `## Related` (it already links every file), and `AGENTS.md` carries no frontmatter. Links are relative from the file's own directory — from `guides/extend.md` write `../conventions.md`. Verify each resolves before you return.
 
 ## Output contract — confirm before you return (non-negotiable)
 

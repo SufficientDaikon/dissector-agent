@@ -45,6 +45,10 @@ Per dependency: category (runtime/dev/optional/peer), version constraint, purpos
 - `OUTPUT_PATH/dependencies.md` — `type: domain`, `id: dependencies`. Fenced YAML: `dependencies: [{name, version, category, purpose, used_in}]` (sorted by name), then `version_strategy:` and `notable:` sections.
 - `OUTPUT_PATH/build-and-test.md` — `type: domain`, `id: build-and-test`. The operational facts an agent needs to work on this repo: fenced YAML `commands: [{cmd, purpose, when}]`, `ci_pipelines: [{name, file, triggers, jobs}]`, `deployment: []`, `env_vars: [{name, purpose, required, default}]`, with cites.
 
+## Concept cross-references (standards §3a)
+
+Give each of `tech-stack.md`, `dependencies.md`, `build-and-test.md` a sorted `related:` frontmatter list and a closing `## Related` markdown-link section pointing at its siblings: `tech-stack` ↔ `dependencies` ↔ `build-and-test`, and `build-and-test` → `testing`. All three live at the KB root, so links are bare filenames (`dependencies.md`, `testing.md`). Verify each resolves before you return.
+
 ## Output contract — confirm before you return (non-negotiable)
 
 The KB's whole value is its machine format. These are the most-missed rules — verify all three before your final message:

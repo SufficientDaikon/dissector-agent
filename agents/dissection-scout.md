@@ -41,6 +41,10 @@ Your prompt provides `CODEBASE_PATH`, `OUTPUT_PATH`, `PROJECT_NAME`, and `EXCLUD
 - `OUTPUT_PATH/modules/<module-id>.md` — one per module; `type: module`; `id: modules/<module-id>` where `<module-id>` is the module's source path with each `/` replaced by a **double hyphen `--`** (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths: a single `/` never maps to a single `-`, so `src/foo-bar` (→ `src--foo-bar`) and `src/foo/bar` (→ `src--foo--bar`) stay distinct. (Edge case: a real directory literally named `foo--bar` could in theory collide with `foo/-bar`; such names essentially never occur — if you ever hit one, append a numeric suffix and note it in your manifest.) Frontmatter: `source_roots`, `covers`, `public_exports`, `depends_on` (KB ids of other modules). Body: purpose; key files (fenced YAML `files: [{path, role}]`); internal structure; exports summary; gotchas/coupling notes; cites throughout.
 - Also `mkdir -p OUTPUT_PATH/modules OUTPUT_PATH/api OUTPUT_PATH/guides` if missing.
 
+## Concept cross-references (standards §3a)
+
+Every file you write gets a sorted `related:` frontmatter list and a closing `## Related` markdown-link section. Natural edges: each `modules/<m>.md` → its `api/<m>` (the interface documenter may create it) and `architecture`; `architecture.md` → the top-level modules it graphs and `tech-stack`. `depends_on` stays the code-dependency edge (module files only); `related` is the broader associative one. Links are relative from the file's own directory — from `modules/foo.md` to architecture write `../architecture.md`, to its api file `../api/foo.md`. Verify each link resolves before you return.
+
 ## Return: the Recon Brief
 
 Return **two separate top-level YAML blocks** — never merged into one. First the `recon_brief:` block below (it is pasted into every downstream specialist's prompt), then the `manifest:` block from dissection-standards §7. They are different structures with different keys; do not rename `manifest:` to `dissection_manifest` or fold the brief into it.

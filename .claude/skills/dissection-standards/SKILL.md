@@ -47,11 +47,21 @@ description: <one sentence — what an agent learns from this file>
 source_roots: [src/parser]        # source dirs this file describes
 covers: ["src/parser/**"]         # source globs this file's facts derive from
 public_exports: [Lexer, parse]    # type: module/api
-depends_on: [modules/src-ast]     # KB ids or "npm:pkg@ver" — type: module
+depends_on: [modules/src-ast]     # KB ids or "npm:pkg@ver" — type: module ONLY (dependency edge)
+related: [api/src-parser, patterns]  # KB ids of associated concepts — ANY type (see §3a)
 ---
 ```
 
-**`type`, `id`, `title`, and `description` are REQUIRED on every KB file** — never omit `title` or `description`. They are how a consuming agent previews a file (and how the index is built) without reading the body, so a missing one is a defect. Only the type-specific keys (`source_roots`, `covers`, `public_exports`, `depends_on`) are conditional.
+**`type`, `id`, `title`, and `description` are REQUIRED on every KB file** — never omit `title` or `description`. They are how a consuming agent previews a file (and how the index is built) without reading the body, so a missing one is a defect. Only the type-specific keys (`source_roots`, `covers`, `public_exports`, `depends_on`, `related`) are conditional.
+
+## 3a. Concept cross-references — the KB is a graph, not a folder
+
+The KB is a **graph of concepts**, and a consuming agent navigates it by hopping concept→concept — not only through `index.md`. Every KB file must expose its edges to sibling KB files so that traversal is possible from any node. This is the second machine affordance after `cite:` (which points at *source*; these edges point at *other KB files*).
+
+- **`related:` frontmatter (all types).** A sorted list of KB ids (output-relative path minus `.md`, e.g. `api/src-parser`, `patterns`, `security`) naming the concepts this file is associated with. Distinct from `depends_on`, which is the narrower *code-dependency* edge and stays module-only. Use `related:` for associative links: a `modules/<m>` ↔ its `api/<m>`; a module ↔ the `patterns`/`security`/`errors` entries that discuss it; a glossary term ↔ the module that implements it. Greppable: `grep -rn '^related:'` enumerates the whole graph. Omit the key if a file genuinely has no siblings (rare).
+- **`## Related` body section (every file except the root `index.md`).** End the file with a section titled exactly `## Related`, containing a sorted bullet list of inline markdown links to those same siblings — `- [<title>](<relative-path>.md) — <≤6-word reason>`. Relative path from *this* file's directory (e.g. from `api/foo.md` to a module: `../modules/foo.md`). Every link must resolve; the orchestrator's Stage-4 check tests them. This mirrors `related:` (plus `depends_on` for modules) into human/visualizer-navigable form and makes the KB a valid linked bundle for any graph consumer.
+- **Determinism:** sort both `related:` and the `## Related` bullets lexicographically by id; no volatile data. Reciprocity is expected but not mandatory — link A→B whenever B is genuinely relevant to A; do not fabricate edges to force symmetry.
+- Only the root `index.md` (id `index`) is exempt from `## Related` — it already links every file. This exemption is keyed on the **file id**, NOT the `type` value: `symbol-map.md` is also `type: index` but is NOT exempt and still gets a `## Related` section. The synthesist writes index.md's listing links as before.
 
 Body rules:
 - Terse declarative prose. No filler, no "as we can see", no marketing tone.
