@@ -62,7 +62,7 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
    - Immediately write a **stub `OUTPUT_PATH/manifest.yaml`** so an interrupted run is recognizable and overwritable next time (Stage 4 overwrites it with the full manifest):
      ```yaml
      schema_version: "1.0"
-     generator: {name: dissector, version: 2.1.0}
+     generator: {name: dissector, version: 2.2.0}
      generated_from:
        path: <CODEBASE_PATH>
      status: {complete: false, phases_completed: 0}
@@ -128,7 +128,7 @@ Print `[Phase 13/13] Output — manifest, verification, summary...`
 1. **Write `OUTPUT_PATH/manifest.yaml`** — aggregate from the manifests, overwriting the Stage 0 stub:
 ```yaml
 schema_version: "1.0"
-generator: {name: dissector, version: 2.1.0}
+generator: {name: dissector, version: 2.2.0}
 generated_from:
   path: <CODEBASE_PATH>
   commit: <git -C CODEBASE_PATH rev-parse HEAD, or null>

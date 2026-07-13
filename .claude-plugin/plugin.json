@@ -1,6 +1,6 @@
 {
   "name": "dissector",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Reverse-engineer any codebase into an agent-optimized, citation-checked knowledge base. Orchestrates seven specialist subagents to produce a local-first {project}-dissection/ folder mapping architecture, modules, APIs, conventions, patterns, tests, security, and build system.",
   "author": {
     "name": "SufficientDaikon"
