@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dissector Agent — Codebase Reverse Engineering Documentation</title>
-<meta name="description" content="A Copilot CLI agent that reverse-engineers any codebase into comprehensive documentation through 13 systematic analysis phases.">
+<title>Dissector — Agent-Optimized Codebase Reverse Engineering for Claude Code</title>
+<meta name="description" content="A Claude Code multi-agent system that reverse-engineers any codebase into an agent-optimized knowledge base.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <style>
 /* ============================================================
@@ -746,8 +746,8 @@ footer a { color: var(--accent); }
      ============================================================ -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <h2>🔬 Dissector Agent</h2>
-    <p>v1.0.0 · claude-opus-4.6</p>
+    <h2>🔬 Dissector</h2>
+    <p>v2.1.0 · Claude Code multi-agent system</p>
     <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
   </div>
   <nav>
@@ -764,12 +764,13 @@ footer a { color: var(--accent); }
       <li class="section-label">Usage</li>
       <li><a href="#how-it-works">How It Works</a></li>
       <li><a href="#13-phases">The 13 Phases</a></li>
-      <li><a href="#output-structure">Output Structure</a></li>
-      <li><a href="#prompts">Prompts & Examples</a></li>
+      <li><a href="#output-structure">Output Format</a></li>
+      <li><a href="#prompts">Prompts &amp; Examples</a></li>
 
       <li class="section-label">Reference</li>
       <li><a href="#architecture">Architecture</a></li>
       <li><a href="#configuration">Configuration</a></li>
+      <li><a href="#security">Security</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
       <li><a href="#file-reference">File Reference</a></li>
     </ul>
@@ -783,24 +784,25 @@ footer a { color: var(--accent); }
 
 <!-- HERO -->
 <div class="hero" id="hero">
-  <h1><span class="emoji">🔬</span>Dissector Agent</h1>
+  <h1><span class="emoji">🔬</span>Dissector</h1>
   <p class="tagline">
-    A GitHub Copilot CLI agent that reverse-engineers any codebase into comprehensive, organized documentation through 13 systematic analysis phases. Point it at a codebase — get 17+ interlinked markdown documents.
+    A Claude Code multi-agent system that reverse-engineers any codebase into an agent-optimized knowledge base — a complete, machine-parseable map another AI agent can load to understand, extend, rebuild, or maintain the project.
   </p>
   <div class="hero-badges">
-    <span class="badge">🤖 Copilot CLI Agent</span>
-    <span class="badge">🧠 claude-opus-4.6</span>
-    <span class="badge">📝 17+ Documents</span>
-    <span class="badge">🔄 13 Analysis Phases</span>
+    <span class="badge">🤖 Claude Code Multi-Agent</span>
+    <span class="badge">🗺️ Agent-Readable Output</span>
+    <span class="badge">⚡ Parallel Analysis</span>
+    <span class="badge">🔄 13-Phase Methodology</span>
     <span class="badge">🌐 Any Language</span>
   </div>
   <div class="hero-quickstart">
     <h3>⚡ Quick Start</h3>
-    <code class="comment"># Install the agent</code>
-    <code>git clone https://github.com/SufficientDaikon/dissector-agent.git</code>
-    <code>cd dissector-agent && ./install.sh</code>
-    <code class="comment"># In VS Code Copilot Chat:</code>
-    <code>@dissector Dissect /path/to/your/codebase</code>
+    <code class="comment"># Install the plugin (from any Claude Code session)</code>
+    <code>/plugin marketplace add SufficientDaikon/dissector-agent</code>
+    <code>/plugin install dissector@dissector-marketplace</code>
+    <code class="comment"># Then dissect any codebase:</code>
+    <code>/dissect /path/to/your/codebase</code>
+    <code class="comment"># No plugin? Fallback: git clone … && ./install.sh</code>
   </div>
 </div>
 
@@ -810,64 +812,53 @@ footer a { color: var(--accent); }
 <section id="what-is-this">
   <h2>🤔 What Is This?</h2>
   <p>
-    The <strong>Dissector Agent</strong> is a custom agent for <strong>GitHub Copilot CLI</strong>. When you install it, you get a new <code>@dissector</code> command in your Copilot Chat panel. Give it a path to any codebase, and it will autonomously analyze every source file — producing a complete documentation folder that covers architecture, design patterns, coding conventions, API references, testing strategies, security practices, build systems, and more.
+    <strong>Dissector</strong> is a system of seven cooperating <strong>Claude Code</strong> agents. Give it a path to any codebase and it autonomously analyzes the whole project — architecture, modules, public APIs, coding conventions, design patterns, tests, error handling, security posture, dependencies, and build system — and writes the result as a <code>{project}-dissection/</code> knowledge base.
   </p>
   <p>
-    Think of it as a <strong>senior engineer who reads your entire codebase and writes the documentation that should exist</strong>. It works with any programming language, any framework, any project size — from 10 files to 10,000+.
+    The output is <strong>optimized for agents, not humans</strong>: Markdown files with YAML frontmatter (the same convention as <code>llms.txt</code>, <code>AGENTS.md</code>, and <code>CLAUDE.md</code>), a small root index that links to focused per-domain and per-module files, greppable <code>cite:</code> tokens anchoring every claim to source lines, and a <code>manifest.yaml</code> that maps every knowledge-base file to the source globs and content hashes it was derived from — so agents can detect exactly what went stale after a code change.
   </p>
-
-  <h3>What Makes It Different?</h3>
-  <div class="card-grid">
-    <div class="card">
-      <span class="icon">🤖</span>
-      <h4>Fully Autonomous</h4>
-      <p>Give it a path and walk away. It runs 13 phases without asking questions, producing complete output.</p>
-    </div>
-    <div class="card">
-      <span class="icon">📎</span>
-      <h4>Code Citations</h4>
-      <p>Every claim is backed by an exact file path and line number. No hallucinated descriptions — real code evidence.</p>
-    </div>
-    <div class="card">
-      <span class="icon">🛡️</span>
-      <h4>Secret Redaction</h4>
-      <p>Automatically detects API keys, tokens, and passwords. Replaces them with [REDACTED] in all output.</p>
-    </div>
-    <div class="card">
-      <span class="icon">📏</span>
-      <h4>Scales Gracefully</h4>
-      <p>Auto-selects sampling strategy: exhaustive for small, stratified for large codebases. No config needed.</p>
-    </div>
-    <div class="card">
-      <span class="icon">🔁</span>
-      <h4>Idempotent</h4>
-      <p>Safe to re-run. Detects previous dissections and overwrites them. Non-dissection folders are never touched.</p>
-    </div>
-    <div class="card">
-      <span class="icon">🌐</span>
-      <h4>Any Language</h4>
-      <p>35+ language extensions recognized. Polyglot codebases get per-language analysis sections.</p>
-    </div>
-  </div>
+  <p>
+    Think of it as <strong>a senior engineer who reads the entire codebase once and writes the map every future agent will navigate by</strong>. Works with any language, any framework, from 10 files to 10,000+.
+  </p>
 </section>
 
 <!-- WHAT'S INCLUDED -->
 <section id="whats-included">
   <h2>📦 What's Included</h2>
-  <div class="file-tree">
-    <span class="dir">dissector-agent/</span><br>
-    ├── <span class="file">README.md</span> <span class="comment">— Complete usage guide</span><br>
-    ├── <span class="file">LICENSE</span> <span class="comment">— MIT License</span><br>
-    ├── <span class="file">install.ps1</span> <span class="comment">— Windows installer (PowerShell)</span><br>
-    ├── <span class="file">install.sh</span> <span class="comment">— macOS/Linux installer (Bash)</span><br>
-    ├── <span class="dir">agents/</span><br>
-    │   └── <span class="file">dissector.agent.md</span> <span class="comment">— The agent profile (1,790 lines)</span><br>
-    └── <span class="dir">docs/</span><br>
-    &nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">index.html</span> <span class="comment">— This documentation website</span>
+  <div class="card-grid">
+    <div class="card">
+      <h3><span class="icon">⌨️</span> /dissect command</h3>
+      <p><code>.claude/commands/dissect.md</code> — the primary entry point, available in any session.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">📖</span> dissect skill</h3>
+      <p><code>.claude/skills/dissect/SKILL.md</code> — the orchestration playbook: validation, staging, parallel fan-out, finalization.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">📐</span> dissection-standards skill</h3>
+      <p><code>.claude/skills/dissection-standards/SKILL.md</code> — shared methodology and the knowledge-base format spec, preloaded into every specialist.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🎛️</span> dissector agent</h3>
+      <p><code>.claude/agents/dissector.md</code> — the orchestrator, for dedicated runs via <code>claude --agent dissector</code>.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🕵️</span> 6 specialist agents</h3>
+      <p><code>.claude/agents/dissection-*.md</code> — scout, stack auditor, style analyst, interface documenter, quality auditor, synthesist. Each runs in its own context window.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🧩</span> Plugin manifest</h3>
+      <p><code>.claude-plugin/plugin.json</code> + <code>marketplace.json</code> — packages the agents, skills, command, and write-guard hook as an installable, versioned Claude Code plugin.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🛡️</span> write-guard hook <em>(plugin install)</em></h3>
+      <p><code>hooks/hooks.json</code> + <code>scripts/write-guard.sh</code> — a <code>PreToolUse</code> guard shipped with the plugin that only lets specialists write inside the <code>*-dissection/</code> output folder.</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🧰</span> Installers</h3>
+      <p><code>install.sh</code> / <code>install.ps1</code> — copy everything into <code>~/.claude/</code> for user-level availability (fallback for offline / no-plugin setups).</p>
+    </div>
   </div>
-  <p>
-    The entire agent is a <strong>single markdown file</strong> (<code>dissector.agent.md</code>) — 1,790 lines of structured instructions. The install scripts copy it to <code>~/.copilot/agents/</code> where Copilot CLI picks it up automatically.
-  </p>
 </section>
 
 <!-- INSTALLATION -->
@@ -875,13 +866,29 @@ footer a { color: var(--accent); }
   <h2>🔧 Installation</h2>
   <h3>Prerequisites</h3>
   <ul>
-    <li><strong>GitHub Copilot CLI</strong> — installed and authenticated (<code>copilot --version</code>)</li>
-    <li><strong>VS Code</strong> with <a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot">GitHub Copilot</a> and <a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat">Copilot Chat</a> extensions</li>
-    <li><strong>A Copilot subscription</strong> (Individual, Business, or Enterprise)</li>
+    <li><strong>Claude Code CLI</strong> — installed and authenticated (<a href="https://code.claude.com/docs">docs</a>)</li>
     <li><strong>Git</strong> (to clone this repository)</li>
   </ul>
 
-  <h3>Step-by-Step</h3>
+  <h3>Option A — Claude Code plugin (recommended)</h3>
+  <p>Versioned, auto-updating, and the only install path that ships the <code>PreToolUse</code> write-guard hook (see <a href="#security">Security</a>). From any Claude Code session:</p>
+  <div class="code-block-wrapper">
+    <div class="code-block-header"><span>claude code</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+    <pre class="language-bash"><code>/plugin marketplace add SufficientDaikon/dissector-agent
+/plugin install dissector@dissector-marketplace</code></pre>
+  </div>
+  <p>Installs the seven agents, both skills, the <code>/dissect</code> command, and the write-guard hook as a semver-tagged bundle you can update in place. For a team, check the plugin into the repo's project settings so every collaborator gets it.</p>
+
+  <h3>Option B — Zero-install (project-local)</h3>
+  <p>Clone the repo and start Claude Code inside it. The <code>.claude/</code> directory is picked up automatically and <code>/dissect</code> works in that session.</p>
+  <div class="code-block-wrapper">
+    <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+    <pre class="language-bash"><code>git clone https://github.com/SufficientDaikon/dissector-agent.git
+cd dissector-agent
+claude</code></pre>
+  </div>
+
+  <h3>Option C — User-level script install (fallback for offline / no-plugin setups)</h3>
   <div class="steps">
     <div class="step">
       <div class="step-content">
@@ -904,17 +911,17 @@ chmod +x install.sh && ./install.sh
 # Windows PowerShell
 .\install.ps1</code></pre>
         </div>
+        <p>This copies the agents, skills, and command into <code>~/.claude/</code>.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-content">
         <h4>Verify it works</h4>
-        <p>Open VS Code, open the Copilot Chat panel, and type:</p>
         <div class="code-block-wrapper">
-          <div class="code-block-header"><span>copilot chat</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-          <pre class="language-bash"><code>@dissector What can you do?</code></pre>
+          <div class="code-block-header"><span>claude code</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre class="language-bash"><code>/dissect</code></pre>
         </div>
-        <p>The agent should respond describing its 13-phase codebase analysis capability.</p>
+        <p>Dissector should ask which codebase to analyze.</p>
       </div>
     </div>
   </div>
@@ -923,418 +930,214 @@ chmod +x install.sh && ./install.sh
 <!-- QUICK START -->
 <section id="quick-start">
   <h2>⚡ Quick Start</h2>
-  <p>Get your first dissection in under 2 minutes:</p>
+  <p>Get your first dissection with one command:</p>
   <div class="code-block-wrapper">
-    <div class="code-block-header"><span>copilot chat</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-    <pre class="language-bash"><code>@dissector Dissect /path/to/any/codebase</code></pre>
+    <div class="code-block-header"><span>claude code</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+    <pre class="language-bash"><code>/dissect /path/to/any/codebase</code></pre>
   </div>
   <p>
-    The agent runs all 13 phases autonomously. When done, you'll find a <code>"{project-name} dissection"</code> folder in your working directory containing 17+ interlinked markdown documents.
+    The orchestrator validates the path, then runs the full pipeline autonomously. When done you'll find a <code>{project-name}-dissection/</code> folder in your working directory. Point any agent at its <code>index.md</code> to load the codebase map.
   </p>
+  <p>Prefer a dedicated session? Run <code>claude --agent dissector</code> instead — it greets you and asks for the path.</p>
 </section>
 
 <!-- HOW IT WORKS -->
 <section id="how-it-works">
   <h2>⚙️ How It Works</h2>
-
+  <p>
+    A single agent analyzing a large codebase in one context window runs out of room. Dissector solves this structurally: an <strong>orchestrator</strong> that never reads source code coordinates <strong>six specialists</strong>, each with a fresh context window, and runs the four heaviest analysts <strong>in parallel</strong>. Specialists write their knowledge-base files directly and return only a compact manifest, so the orchestrator stays small no matter the target size.
+  </p>
   <div class="arch-diagram">
     <div class="arch-flow">
-      <div class="arch-node">
-        👤 You invoke <code>@dissector</code>
-        <small>Provide a codebase path</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node highlight">
-        🔬 Dissector Agent
-        <small>Validates path → resolves project name → runs 13 phases</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node">
-        📂 File System Tools
-        <small>glob · grep · read · create · powershell</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node output">
-        📝 Dissection Folder
-        <small>17+ interlinked markdown documents</small>
-      </div>
+      <div class="arch-node">/dissect &lt;path&gt; — Stage 0: validate, resolve name, prepare output</div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-node">Stage 1 · dissection-scout — discovery + structure → Recon Brief</div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-node highlight">Stage 2 · IN PARALLEL: stack-auditor · style-analyst · interface-documenter · quality-auditor</div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-node">Stage 3 · dissection-synthesist — guides, glossary, root index</div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-node output">Stage 4 · manifest.yaml + link verification → {project}-dissection/</div>
     </div>
   </div>
-
-  <h3>Key Design Principles</h3>
-  <ul>
-    <li><strong>Static analysis only</strong> — the agent never executes, compiles, or runs your code</li>
-    <li><strong>Autonomous execution</strong> — once started, it runs all phases without user interaction</li>
-    <li><strong>Resilient</strong> — unreadable files, encoding errors, and binary files are skipped gracefully</li>
-    <li><strong>Honest</strong> — documents what IS, not what should be; notes discrepancies between documented conventions and actual code</li>
-    <li><strong>Every claim is cited</strong> — code excerpts include exact file path and line numbers</li>
-  </ul>
+  <p>
+    Safety and rigor guarantees carried over from the original methodology: <strong>static analysis only</strong> (never executes target code), <strong>secret redaction</strong> (detected keys/tokens become <code>[REDACTED]</code>), <strong>crash-proof</strong> (unreadable files are skipped and logged), <strong>idempotent</strong> (a re-run overwrites a previous dissection after a warning, but only once a provenance gate confirms the folder's <code>manifest.yaml</code> carries <code>generator.name: dissector</code> and was generated from the same codebase — a folder failing either check is refused, never deleted), and <strong>adaptive sampling</strong> for codebases above 500 / 2,000 source files. See <a href="#security">Security</a> for the write-guard and injection-resistance details.
+  </p>
 </section>
 
 <!-- 13 PHASES -->
 <section id="13-phases">
   <h2>🔢 The 13 Analysis Phases</h2>
-  <p>Each phase builds on data from previous phases. They execute in strict order:</p>
+  <p>The classic Dissector methodology is preserved — redistributed across the specialists:</p>
   <div class="phase-grid">
-    <div class="phase-chip"><span class="phase-num">1</span> Discovery</div>
-    <div class="phase-chip"><span class="phase-num">2</span> Structure</div>
-    <div class="phase-chip"><span class="phase-num">3</span> Tech Stack</div>
-    <div class="phase-chip"><span class="phase-num">4</span> Conventions</div>
-    <div class="phase-chip"><span class="phase-num">5</span> Patterns</div>
-    <div class="phase-chip"><span class="phase-num">6</span> APIs</div>
-    <div class="phase-chip"><span class="phase-num">7</span> Testing</div>
-    <div class="phase-chip"><span class="phase-num">8</span> Error Handling</div>
-    <div class="phase-chip"><span class="phase-num">9</span> Security &amp; Perf</div>
-    <div class="phase-chip"><span class="phase-num">10</span> Dependencies</div>
-    <div class="phase-chip"><span class="phase-num">11</span> Build System</div>
-    <div class="phase-chip"><span class="phase-num">12</span> Synthesis</div>
-    <div class="phase-chip"><span class="phase-num">13</span> Output</div>
+    <div class="phase-chip"><span class="phase-num">1</span> Discovery <em>— scout</em></div>
+    <div class="phase-chip"><span class="phase-num">2</span> Structure <em>— scout</em></div>
+    <div class="phase-chip"><span class="phase-num">3</span> Tech Stack <em>— stack auditor</em></div>
+    <div class="phase-chip"><span class="phase-num">4</span> Conventions <em>— style analyst</em></div>
+    <div class="phase-chip"><span class="phase-num">5</span> Patterns <em>— style analyst</em></div>
+    <div class="phase-chip"><span class="phase-num">6</span> APIs <em>— interface documenter</em></div>
+    <div class="phase-chip"><span class="phase-num">7</span> Testing <em>— quality auditor</em></div>
+    <div class="phase-chip"><span class="phase-num">8</span> Error Handling <em>— interface documenter</em></div>
+    <div class="phase-chip"><span class="phase-num">9</span> Security &amp; Perf <em>— quality auditor</em></div>
+    <div class="phase-chip"><span class="phase-num">10</span> Dependencies <em>— stack auditor</em></div>
+    <div class="phase-chip"><span class="phase-num">11</span> Build System <em>— stack auditor</em></div>
+    <div class="phase-chip"><span class="phase-num">12</span> Synthesis <em>— synthesist</em></div>
+    <div class="phase-chip"><span class="phase-num">13</span> Output <em>— orchestrator</em></div>
   </div>
-
-  <table>
-    <thead>
-      <tr><th>Phase</th><th>Name</th><th>What It Does</th><th>Output</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>1</td><td>Discovery</td><td>Scans file tree, detects languages, determines sampling strategy</td><td>File counts, language breakdown</td></tr>
-      <tr><td>2</td><td>Structure</td><td>Maps directory architecture, identifies modules, detects architecture patterns</td><td>architecture/README.md, module-map.md</td></tr>
-      <tr><td>3</td><td>Tech Stack</td><td>Identifies frameworks, build tools, test frameworks, CI/CD, infrastructure</td><td>tech-stack.md</td></tr>
-      <tr><td>4</td><td>Conventions</td><td>Reverse-engineers naming, formatting, import, and comment conventions</td><td>conventions/README.md</td></tr>
-      <tr><td>5</td><td>Patterns</td><td>Identifies creational, structural, behavioral, and architectural patterns</td><td>patterns/README.md</td></tr>
-      <tr><td>6</td><td>APIs</td><td>Documents exports, web endpoints, CLI commands, GraphQL schemas</td><td>api-reference/README.md</td></tr>
-      <tr><td>7</td><td>Testing</td><td>Analyzes test framework, structure, fixtures, mocks, coverage</td><td>testing-patterns.md</td></tr>
-      <tr><td>8</td><td>Error Handling</td><td>Documents custom errors, try/catch patterns, logging, recovery</td><td>error-handling.md</td></tr>
-      <tr><td>9</td><td>Security &amp; Perf</td><td>Auth patterns, input validation, caching, async patterns, bottlenecks</td><td>security-patterns.md, performance-patterns.md</td></tr>
-      <tr><td>10</td><td>Dependencies</td><td>Every dependency categorized with purpose and version strategy</td><td>dependencies.md</td></tr>
-      <tr><td>11</td><td>Build System</td><td>Build tools, CI/CD pipelines, deployment configs, env variables</td><td>build-system.md</td></tr>
-      <tr><td>12</td><td>Synthesis</td><td>Generates contribution guide, fork guide, glossary, examples, best practices</td><td>Multiple guide documents</td></tr>
-      <tr><td>13</td><td>Output</td><td>Writes all documents, metadata, prints completion summary</td><td>Complete dissection folder</td></tr>
-    </tbody>
-  </table>
+  <p>Progress banners keep the familiar numbering: <code>[Phase 3-11/13] Parallel analysis — stack, style, interfaces, quality...</code></p>
 </section>
 
 <!-- OUTPUT STRUCTURE -->
 <section id="output-structure">
-  <h2>📂 Output Structure</h2>
-  <p>After a successful dissection, you'll find this folder in your working directory:</p>
+  <h2>📂 Output Format</h2>
+  <p>
+    Every file is Markdown with YAML frontmatter (<code>type</code>, <code>id</code>, <code>covers</code>, <code>public_exports</code>, …), structured inventories in fenced YAML blocks, and own-line citation tokens like <code>cite: src/parser/index.ts#L18-L31 symbol: parse</code>. Lists are sorted, IDs are path-derived and stable, and volatile metadata lives only in <code>manifest.yaml</code> — so regeneration diffs cleanly.
+  </p>
   <div class="file-tree">
-    <span class="dir">{project-name} dissection/</span><br>
-    ├── <span class="file">README.md</span> <span class="comment">— Master index &amp; project overview</span><br>
-    ├── <span class="file">glossary.md</span> <span class="comment">— Domain-specific terms</span><br>
-    ├── <span class="file">tech-stack.md</span> <span class="comment">— Languages, frameworks, tools</span><br>
-    ├── <span class="file">testing-patterns.md</span> <span class="comment">— Test framework, fixtures, mocks</span><br>
-    ├── <span class="file">error-handling.md</span> <span class="comment">— Error types, logging, recovery</span><br>
-    ├── <span class="file">build-system.md</span> <span class="comment">— Build tools, CI/CD, deployment</span><br>
-    ├── <span class="file">dependencies.md</span> <span class="comment">— Every dependency categorized</span><br>
-    ├── <span class="file">security-patterns.md</span> <span class="comment">— Auth, validation, secrets</span><br>
-    ├── <span class="file">performance-patterns.md</span> <span class="comment">— Caching, lazy loading, pooling</span><br>
-    ├── <span class="file">.dissection-metadata</span> <span class="comment">— JSON metadata for idempotency</span><br>
-    ├── <span class="dir">architecture/</span><br>
-    │   ├── <span class="file">README.md</span> <span class="comment">— Architecture overview</span><br>
-    │   └── <span class="file">module-map.md</span> <span class="comment">— Detailed module documentation</span><br>
-    ├── <span class="dir">patterns/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Design patterns with code citations</span><br>
-    ├── <span class="dir">conventions/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Naming, formatting, imports</span><br>
-    ├── <span class="dir">api-reference/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Exports, endpoints, CLI commands</span><br>
-    ├── <span class="dir">best-practices/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Observed practices as rules</span><br>
-    ├── <span class="dir">contribution-guide/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Dev setup, coding standards, PRs</span><br>
-    ├── <span class="dir">fork-guide/</span><br>
-    │   └── <span class="file">README.md</span> <span class="comment">— Module classification, extensions</span><br>
-    └── <span class="dir">examples/</span><br>
-    &nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">README.md</span> <span class="comment">— Code examples organized by concept</span>
+    <div class="dir">{project}-dissection/</div>
+    <div class="file">├── index.md <span class="comment"># START HERE — root map, links to everything</span></div>
+    <div class="file">├── manifest.yaml <span class="comment"># machine index: coverage, hashes, status</span></div>
+    <div class="file">├── architecture.md <span class="comment"># module graph, layers, entry points</span></div>
+    <div class="file">├── symbol-map.md <span class="comment"># ranked signature map of exports</span></div>
+    <div class="file">├── tech-stack.md <span class="comment"># languages, frameworks, tooling</span></div>
+    <div class="file">├── dependencies.md <span class="comment"># every dep: version, category, purpose</span></div>
+    <div class="file">├── build-and-test.md <span class="comment"># commands, CI, deployment, env vars</span></div>
+    <div class="file">├── conventions.md <span class="comment"># implicit style guide with consistency %</span></div>
+    <div class="file">├── patterns.md <span class="comment"># design patterns with confidence grades</span></div>
+    <div class="file">├── errors.md <span class="comment"># error types, propagation, logging</span></div>
+    <div class="file">├── testing.md <span class="comment"># framework, structure, how to add a test</span></div>
+    <div class="file">├── security.md <span class="comment"># observed posture (secrets redacted)</span></div>
+    <div class="file">├── performance.md <span class="comment"># caching, async, bottleneck risks</span></div>
+    <div class="file">├── glossary.md <span class="comment"># domain vocabulary</span></div>
+    <div class="file">├── AGENTS.md <span class="comment"># cross-tool entry point (Codex/Cursor/Copilot/Gemini/…)</span></div>
+    <div class="dir">├── modules/</div>
+    <div class="file">│&nbsp;&nbsp; └── &lt;module-id&gt;.md <span class="comment"># one per module: purpose, files, exports</span></div>
+    <div class="dir">├── api/</div>
+    <div class="file">│&nbsp;&nbsp; └── &lt;module-id&gt;.md <span class="comment"># public API: signatures + citations</span></div>
+    <div class="dir">└── guides/</div>
+    <div class="file">&nbsp;&nbsp;&nbsp; ├── extend.md <span class="comment"># recipes: add a feature/endpoint/test</span></div>
+    <div class="file">&nbsp;&nbsp;&nbsp; └── rebuild.md <span class="comment"># reconstruction map + fork strategy</span></div>
   </div>
+  <p>
+    <strong>How agents consume it:</strong> load <code>index.md</code> and follow links; grep <code>cite:</code> tokens to jump into source; use <code>manifest.yaml</code> to detect staleness — intersect <code>git diff --name-only</code> with each entry's <code>covers</code> globs (or compare <code>source_hashes</code>) and regenerate only the dirty files.
+  </p>
 </section>
 
-<!-- PROMPTS & EXAMPLES -->
+<!-- PROMPTS -->
 <section id="prompts">
   <h2>💬 Prompts &amp; Examples</h2>
-  <p>Copy any of these prompts directly into your Copilot Chat panel. Click to copy.</p>
-
-  <h3>🟢 Getting Started</h3>
 
   <div class="prompt-card getting-started">
-    <span class="prompt-label">Getting Started</span>
-    <h4>Dissect a local project</h4>
-    <p class="prompt-desc">Point the agent at any directory containing source code. It resolves the project name automatically from package.json, Cargo.toml, pyproject.toml, or the directory name.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect C:\Users\dev\projects\my-express-api
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> A <code>"my-express-api dissection"</code> folder with 17+ markdown documents covering the entire codebase.</div>
+    <div class="prompt-label">Getting started</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">/dissect /path/to/codebase<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">Full dissection of any local codebase.</div>
   </div>
 
   <div class="prompt-card getting-started">
-    <span class="prompt-label">Getting Started</span>
-    <h4>Dissect the current workspace</h4>
-    <p class="prompt-desc">If you already have a project open in VS Code, you don't need to specify a path — the agent uses the workspace root.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Analyze this codebase
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> The agent detects the workspace root and produces a dissection folder in the working directory.</div>
-  </div>
-
-  <div class="prompt-card getting-started">
-    <span class="prompt-label">Getting Started</span>
-    <h4>Dissect a subdirectory</h4>
-    <p class="prompt-desc">For monorepos, you can point the agent at a specific package or service directory.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Reverse-engineer the backend: /home/user/monorepo/packages/api
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> The agent scopes analysis to only <code>packages/api</code> and produces an <code>"api dissection"</code> folder.</div>
-  </div>
-
-  <h3>🔵 Common Workflows</h3>
-
-  <div class="prompt-card common">
-    <span class="prompt-label">Common</span>
-    <h4>Onboard to a new team's codebase</h4>
-    <p class="prompt-desc">When joining a new team, run this first. Then read <code>contribution-guide/README.md</code> for dev setup, coding standards, and how to add features.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect /home/dev/company/main-service
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> Complete documentation. Start with the contribution guide for quickest onboarding.</div>
+    <div class="prompt-label">Current project</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">/dissect .<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">Dissect the project you're currently working in.</div>
   </div>
 
   <div class="prompt-card common">
-    <span class="prompt-label">Common</span>
-    <h4>Evaluate a library before adopting it</h4>
-    <p class="prompt-desc">Clone an open-source library locally, then dissect it. Read <code>tech-stack.md</code> and <code>architecture/README.md</code> to understand its design.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect ~/repos/some-open-source-lib
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> Architecture and dependency analysis to evaluate adoption risk.</div>
+    <div class="prompt-label">Dedicated session</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">claude --agent dissector<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">Launch Dissector as the main session agent — it greets you and asks for a path.</div>
   </div>
 
   <div class="prompt-card common">
-    <span class="prompt-label">Common</span>
-    <h4>Document a legacy codebase</h4>
-    <p class="prompt-desc">The agent handles any language and produces structured documentation even for projects with zero existing docs.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect C:\legacy\old-java-monolith
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> 17+ documents covering architecture, patterns, and a contribution guide — even for undocumented code.</div>
-  </div>
-
-  <div class="prompt-card common">
-    <span class="prompt-label">Common</span>
-    <h4>Prepare for a code review</h4>
-    <p class="prompt-desc">Dissect the project to understand its conventions and patterns before reviewing a PR.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect D:\work\feature-branch-checkout
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> <code>conventions/README.md</code> and <code>patterns/README.md</code> explain the project's established patterns.</div>
-  </div>
-
-  <div class="prompt-card common">
-    <span class="prompt-label">Common</span>
-    <h4>Analyze a monorepo</h4>
-    <p class="prompt-desc">The agent detects monorepo structures (Lerna, pnpm workspaces, Cargo workspaces) and documents sub-projects as separate modules.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect /home/user/my-monorepo
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> <code>architecture/module-map.md</code> shows each sub-project with its own analysis.</div>
-  </div>
-
-  <h3>🟣 Advanced</h3>
-
-  <div class="prompt-card advanced">
-    <span class="prompt-label">Advanced</span>
-    <h4>Dissect an open-source project you just cloned</h4>
-    <p class="prompt-desc">Clone any repo from GitHub, then point the dissector at it for a complete reverse-engineering.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect ~/repos/express
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> Complete Express.js internals documentation — middleware pipeline, router, request/response extensions.</div>
+    <div class="prompt-label">Consume a dissection</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">Read my-app-dissection/index.md and explain the architecture, then tell me how to add a new endpoint.<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">Any agent can answer codebase questions from the knowledge base alone — no re-scanning.</div>
   </div>
 
   <div class="prompt-card advanced">
-    <span class="prompt-label">Advanced</span>
-    <h4>Use dissection output as context for other agents</h4>
-    <p class="prompt-desc">After dissecting, reference the output to make other Copilot conversations more informed.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @workspace Based on the architecture in "my-app dissection/architecture/README.md", help me add a new microservice
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> Copilot uses the dissected architecture docs to guide new development.</div>
-  </div>
-
-  <div class="prompt-card advanced">
-    <span class="prompt-label">Advanced</span>
-    <h4>Plan a fork using the fork guide</h4>
-    <p class="prompt-desc">The dissector's fork guide classifies modules and provides extension points. Use it to plan a clean fork.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect ~/repos/upstream-project
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Expected result:</strong> <code>fork-guide/README.md</code> classifies modules (core vs. extension points vs. safe to modify).</div>
-  </div>
-
-  <h3>🔴 Troubleshooting</h3>
-
-  <div class="prompt-card troubleshooting">
-    <span class="prompt-label">Troubleshooting</span>
-    <h4>Path doesn't exist error</h4>
-    <p class="prompt-desc">If you get a "path does not exist" error, make sure you're providing the correct absolute path.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect C:\exact\path\to\my\project
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Fix:</strong> Use an absolute path. On Windows, use backslashes. On macOS/Linux, use forward slashes.</div>
+    <div class="prompt-label">Update after code changes</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">Compare git diff --name-only against the covers globs in my-app-dissection/manifest.yaml and re-run the specialist that owns any stale files.<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">Partial regeneration — only the knowledge-base files whose sources changed.</div>
   </div>
 
   <div class="prompt-card troubleshooting">
-    <span class="prompt-label">Troubleshooting</span>
-    <h4>Partial output / context exhaustion</h4>
-    <p class="prompt-desc">Very large codebases (5000+ files) may exhaust the context window. The agent writes what it has and marks the output as partial.</p>
-    <div class="prompt-box" onclick="copyPrompt(this)">
-      @dissector Dissect ~/repos/very-large-project
-      <span class="copy-hint">Click to copy</span>
-    </div>
-    <div class="expected"><strong>Fix:</strong> Re-run the dissector on the same path. It's idempotent — it will overwrite the partial output with a fresh attempt.</div>
+    <div class="prompt-label">Resume a partial run</div>
+    <div class="prompt-box" onclick="copyPrompt(this)">/dissect /path/to/codebase<span class="copy-hint">Click to copy</span></div>
+    <div class="prompt-desc">If a run was marked partial (see index.md's completion checklist), just re-run — the previous dissection is safely overwritten.</div>
   </div>
 </section>
 
 <!-- ARCHITECTURE -->
 <section id="architecture">
   <h2>🏗️ Architecture</h2>
-  <p>The Dissector Agent is a single <code>.agent.md</code> file that runs inside the GitHub Copilot CLI runtime. Here's how the pieces fit together:</p>
-
-  <div class="arch-diagram">
-    <div class="arch-flow">
-      <div class="arch-node">
-        📄 <strong>dissector.agent.md</strong>
-        <small>1,790 lines · YAML frontmatter + system prompt</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node highlight">
-        🏃 <strong>Copilot CLI Runtime</strong>
-        <small>Parses frontmatter, loads tools, executes system prompt</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node">
-        🔧 <strong>Tool Calls</strong>
-        <small>glob · grep · read · create · powershell · task</small>
-      </div>
-      <div class="arch-arrow"></div>
-      <div class="arch-node output">
-        📁 <strong>"{name} dissection" folder</strong>
-        <small>17+ markdown docs + JSON metadata</small>
-      </div>
-    </div>
-  </div>
-
-  <h3>Agent File Structure</h3>
-  <table>
-    <thead>
-      <tr><th>Section</th><th>Lines</th><th>Purpose</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>YAML Frontmatter</td><td>1–18</td><td>Agent name, description, tools, model selection</td></tr>
-      <tr><td>Core Identity</td><td>20–78</td><td>Who the agent is, what it does and doesn't do</td></tr>
-      <tr><td>Input Handling</td><td>80–121</td><td>Path validation (5-step sequence)</td></tr>
-      <tr><td>Project Name Resolution</td><td>123–161</td><td>8-source precedence chain for naming</td></tr>
-      <tr><td>File Filtering</td><td>163–237</td><td>Exclusion lists, .gitignore, minified detection</td></tr>
-      <tr><td>Sampling Strategy</td><td>239–296</td><td>3 tiers based on codebase size</td></tr>
-      <tr><td>13 Analysis Phases</td><td>298–1055</td><td>The core analysis logic</td></tr>
-      <tr><td>Output Document Specs</td><td>1057–1395</td><td>Format rules for each of the 17+ output files</td></tr>
-      <tr><td>Code Citation Format</td><td>1397–1458</td><td>Standard format for all code excerpts</td></tr>
-      <tr><td>Error Handling</td><td>1460–1528</td><td>26 edge cases with recovery strategies</td></tr>
-      <tr><td>Progress Reporting</td><td>1530–1568</td><td>Phase progress message format</td></tr>
-      <tr><td>Idempotency</td><td>1570–1606</td><td>Safe re-run protocol</td></tr>
-      <tr><td>Secret Redaction</td><td>1608–1637</td><td>Auto-detect and redact secrets</td></tr>
-      <tr><td>Non-Functional Reqs</td><td>1639–1716</td><td>Resilience, navigation, formatting rules</td></tr>
-      <tr><td>Tool Usage Guide</td><td>1750–1790</td><td>Efficiency tips for filesystem tools</td></tr>
-    </tbody>
-  </table>
+  <p>Seven agents, two skills, one command — with strict role boundaries:</p>
+  <ul>
+    <li><strong>dissector</strong> (orchestrator) — validates input, spawns specialists, finalizes <code>manifest.yaml</code>. Restricted to spawning exactly the six specialists via <code>Agent(...)</code> tool rules. Holds only briefs and manifests, never raw source.</li>
+    <li><strong>dissection-scout</strong> — phases 1–2. Maps the tree, detects languages, selects the sampling tier, writes <code>architecture.md</code> + <code>modules/*</code>, returns the Recon Brief every other specialist receives.</li>
+    <li><strong>dissection-stack-auditor</strong> — phases 3, 10, 11. Reads manifests/lockfiles/CI configs only; writes <code>tech-stack.md</code>, <code>dependencies.md</code>, <code>build-and-test.md</code>. Runs at low reasoning effort — it's mechanical.</li>
+    <li><strong>dissection-style-analyst</strong> — phases 4–5. The heaviest source reader; writes <code>conventions.md</code> and <code>patterns.md</code>. Runs at high effort — confidence-graded pattern attribution is judgment-heavy.</li>
+    <li><strong>dissection-interface-documenter</strong> — phases 6, 8. Traces the public boundary; writes <code>api/*</code>, <code>symbol-map.md</code>, <code>errors.md</code>.</li>
+    <li><strong>dissection-quality-auditor</strong> — phases 7, 9. Tests + security/performance posture; writes <code>testing.md</code>, <code>security.md</code>, <code>performance.md</code>.</li>
+    <li><strong>dissection-synthesist</strong> — phase 12. Reads the generated knowledge base (not the codebase) and writes <code>guides/extend.md</code>, <code>guides/rebuild.md</code>, <code>glossary.md</code>, and the root <code>index.md</code>. Runs at high effort.</li>
+  </ul>
+  <p>
+    No two agents write the same file (disjoint ownership makes the Stage-2 parallelism race-free), analysts are read-only on the codebase (<code>Read/Glob/Grep</code> + <code>Write</code> scoped to output), and every specialist is preloaded with the <code>dissection-standards</code> skill so format rules exist in exactly one place.
+  </p>
 </section>
 
 <!-- CONFIGURATION -->
 <section id="configuration">
   <h2>⚙️ Configuration</h2>
-  <h3>Model Selection</h3>
-  <p>The agent uses <code>claude-opus-4.6</code> by default for maximum analysis quality. To change it, edit the YAML frontmatter:</p>
-  <div class="code-block-wrapper">
-    <div class="code-block-header"><span>yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-    <pre class="language-yaml"><code>---
-model: claude-opus-4.6  # Change to claude-sonnet-4 for faster analysis
----</code></pre>
-  </div>
+  <h3>Model selection (not hard-coded)</h3>
+  <p>No agent pins a <code>model:</code> — specialists inherit your session model. Three ways to control it:</p>
+  <ul>
+    <li>Set the session model with <code>/model</code> — all specialists follow.</li>
+    <li>Route every subagent to a specific model with the <code>CLAUDE_CODE_SUBAGENT_MODEL</code> environment variable.</li>
+    <li>Pin per-role models by adding a <code>model:</code> line to any agent's frontmatter — e.g. a cheaper model for the stack auditor, a stronger one for the synthesist.</li>
+  </ul>
+  <h3>Reasoning effort</h3>
+  <p>Each agent ships a task-shaped <code>effort</code> default (<code>low</code> for the mechanical stack audit, <code>high</code> for pattern analysis and synthesis). Edit the frontmatter to change it.</p>
+  <h3>Sampling</h3>
+  <p>Automatic by codebase size: &lt;500 source files → every file read; 500–2,000 → all read, repetitive patterns summarized; &gt;2,000 → stratified sampling (entry points, configs, APIs, tests exhaustively; proportional sampling elsewhere), disclosed in <code>index.md</code> and <code>manifest.yaml</code>.</p>
+</section>
 
-  <table>
-    <thead><tr><th>Model</th><th>Speed</th><th>Quality</th><th>Best For</th></tr></thead>
-    <tbody>
-      <tr><td><code>claude-opus-4.6</code></td><td>Slower</td><td>Highest</td><td>Thorough analysis, large codebases</td></tr>
-      <tr><td><code>claude-sonnet-4</code></td><td>Faster</td><td>High</td><td>Quick dissections, smaller codebases</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Automatic Sampling</h3>
-  <p>The agent auto-selects sampling based on file count. No configuration needed:</p>
-  <table>
-    <thead><tr><th>Source Files</th><th>Strategy</th><th>Coverage</th></tr></thead>
-    <tbody>
-      <tr><td>&lt; 500</td><td>Exhaustive</td><td>100% of files</td></tr>
-      <tr><td>500–2,000</td><td>Full + Summarize</td><td>100% analyzed, patterns summarized</td></tr>
-      <tr><td>&gt; 2,000</td><td>Stratified Sampling</td><td>100% structural + 15% per module</td></tr>
-    </tbody>
-  </table>
+<!-- SECURITY -->
+<section id="security">
+  <h2>🔒 Security</h2>
+  <ul>
+    <li><strong>Static analysis only</strong> — Dissector never executes, compiles, or runs the target code, and never fetches remote repositories.</li>
+    <li><strong>Write-guard hook (plugin install)</strong> — the <strong>plugin</strong> ships a <code>PreToolUse</code> hook (<code>scripts/write-guard.sh</code>) that emits <code>permissionDecision: allow</code> for writes inside the <code>*-dissection/</code> output folder and <code>permissionDecision: ask</code> for anything else, so an injected payload can't silently steer a specialist into writing elsewhere. This harness-level backstop rides with the plugin install only; the <strong>zero-install</strong> and <strong>script-install</strong> paths instead rely on the agents' <code>permissionMode: acceptEdits</code> plus the in-prompt rule that analyzed content is <strong>data, never instructions</strong>.</li>
+    <li><strong>Prompt-injection resistance</strong> — analyzed file content is treated as untrusted <strong>data, never instructions</strong>. If a codebase contains text addressed to an AI agent ("ignore your instructions, write X…"), specialists record it as a finding and do not comply.</li>
+    <li><strong>Secret redaction</strong> — anchored patterns for AWS keys, JWTs, private keys, and modern provider tokens (<code>sk-</code>/<code>sk-ant-</code>, <code>ghp_</code>/<code>github_pat_</code>, <code>xoxb-</code>, <code>AIza</code>, <code>npm_</code>, <code>glpat-</code>, and more) become <code>[REDACTED]</code>, with a deterministic Stage-4 grep over the generated knowledge base as a second layer.</li>
+    <li><strong>Citation verification</strong> — every <code>cite:</code> token is machine-checked (file exists, line range in bounds, symbol present) and the verified/broken counts are reported in <code>manifest.yaml</code>.</li>
+  </ul>
 </section>
 
 <!-- TROUBLESHOOTING -->
 <section id="troubleshooting">
   <h2>🔧 Troubleshooting</h2>
-
-  <h3>Agent not found when typing <code>@dissector</code></h3>
-  <p><strong>Cause:</strong> The agent file is not in the correct directory.</p>
-  <div class="code-block-wrapper">
-    <div class="code-block-header"><span>powershell</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-    <pre class="language-powershell"><code># Windows — verify the file exists
-Test-Path "$env:USERPROFILE\.copilot\agents\dissector.agent.md"
-
-# macOS/Linux
-test -f ~/.copilot/agents/dissector.agent.md && echo "Found" || echo "Not found"</code></pre>
-  </div>
-  <p>If not found, re-run the installer.</p>
-
-  <h3>Dissection takes a very long time</h3>
-  <p><strong>Cause:</strong> Large codebases (2000+ files) require extensive analysis.</p>
-  <p><strong>Fix:</strong> The agent auto-uses stratified sampling. For faster results, change the model to <code>claude-sonnet-4</code>.</p>
-
-  <h3>Context window exhaustion / Partial output</h3>
-  <p><strong>Cause:</strong> Very large codebases may exhaust the LLM context.</p>
-  <p><strong>Fix:</strong> Re-run the agent. It's idempotent — it overwrites partial output.</p>
-
-  <h3>Output folder "already exists" error</h3>
-  <p><strong>Cause:</strong> A folder exists with the expected name but wasn't created by the dissector.</p>
-  <p><strong>Fix:</strong> Rename or move the conflicting folder, then re-run.</p>
+  <ul>
+    <li><strong><code>/dissect</code> not found</strong> — for user-level installs, confirm <code>~/.claude/commands/dissect.md</code> exists (re-run the installer); for project-local use, make sure you started Claude Code inside the cloned repo.</li>
+    <li><strong>"Refusing to delete / overwrite" on re-run</strong> — the overwrite provenance gate refused: the existing <code>{project}-dissection</code> folder either has no <code>manifest.yaml</code>, has one not written by Dissector (<code>generator.name</code> ≠ <code>dissector</code>), or is a dissection of a <em>different</em> codebase. Dissector never deletes a folder it can't prove it generated for this project: rename it or run from another directory.</li>
+    <li><strong>Run marked PARTIAL</strong> — a specialist failed twice. <code>index.md</code> lists what's missing and <code>manifest.yaml</code> has <code>status.complete: false</code>. Re-run <code>/dissect</code>, or ask Claude to re-run just the named specialist.</li>
+    <li><strong>Dissector answered from a subagent and refused to run</strong> — orchestration must run in the main session (subagents can't spawn subagents). Use <code>/dissect</code> directly or <code>claude --agent dissector</code>.</li>
+    <li><strong>Huge codebase, slow run</strong> — Tier-3 sampling engages automatically above 2,000 source files; you can also point <code>/dissect</code> at a subdirectory to scope the analysis.</li>
+  </ul>
 </section>
 
 <!-- FILE REFERENCE -->
 <section id="file-reference">
   <h2>📋 File Reference</h2>
-  <table>
-    <thead><tr><th>Path</th><th>Size</th><th>Purpose</th></tr></thead>
-    <tbody>
-      <tr><td><code>agents/dissector.agent.md</code></td><td>~64 KB</td><td>Complete agent profile — 13 phases, error handling, output specs, citation format</td></tr>
-      <tr><td><code>docs/index.html</code></td><td>Self-contained</td><td>This documentation website — dark/light mode, syntax highlighting, copy buttons</td></tr>
-      <tr><td><code>install.ps1</code></td><td>&lt; 2 KB</td><td>Windows installer — copies agent to <code>~/.copilot/agents/</code></td></tr>
-      <tr><td><code>install.sh</code></td><td>&lt; 2 KB</td><td>macOS/Linux installer — copies agent to <code>~/.copilot/agents/</code></td></tr>
-      <tr><td><code>README.md</code></td><td>~20 KB</td><td>GitHub README with full usage docs, prompts, troubleshooting</td></tr>
-      <tr><td><code>LICENSE</code></td><td>&lt; 2 KB</td><td>MIT License</td></tr>
-    </tbody>
-  </table>
+  <ul>
+    <li><code>.claude/commands/dissect.md</code> — the <code>/dissect</code> slash command</li>
+    <li><code>.claude/skills/dissect/SKILL.md</code> — orchestration playbook (stages 0–4, partial-run protocol)</li>
+    <li><code>.claude/skills/dissection-standards/SKILL.md</code> — shared filtering/sampling/format/citation/redaction rules + the specialist manifest contract</li>
+    <li><code>.claude/agents/dissector.md</code> — orchestrator agent (<code>claude --agent dissector</code>)</li>
+    <li><code>.claude/agents/dissection-scout.md</code> — phases 1–2</li>
+    <li><code>.claude/agents/dissection-stack-auditor.md</code> — phases 3, 10, 11</li>
+    <li><code>.claude/agents/dissection-style-analyst.md</code> — phases 4–5</li>
+    <li><code>.claude/agents/dissection-interface-documenter.md</code> — phases 6, 8</li>
+    <li><code>.claude/agents/dissection-quality-auditor.md</code> — phases 7, 9</li>
+    <li><code>.claude/agents/dissection-synthesist.md</code> — phase 12</li>
+    <li><code>install.sh</code> / <code>install.ps1</code> — user-level installers (→ <code>~/.claude/</code>)</li>
+  </ul>
 </section>
 
 </div><!-- /.content-area -->
@@ -1342,7 +1145,7 @@ test -f ~/.copilot/agents/dissector.agent.md && echo "Found" || echo "Not found"
 <!-- FOOTER -->
 <footer>
   <p>
-    <strong>Dissector Agent</strong> · v1.0.0 · Built for <a href="https://docs.github.com/en/copilot">GitHub Copilot CLI</a>
+    <strong>Dissector</strong> · v2.1.0 · Built for <a href="https://code.claude.com/docs">Claude Code</a>
   </p>
   <p style="margin-top:8px;">
     <a href="https://github.com/SufficientDaikon/dissector-agent">GitHub</a> ·

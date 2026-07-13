@@ -1,0 +1,21 @@
+{
+  "name": "dissector",
+  "version": "2.1.0",
+  "description": "Reverse-engineer any codebase into an agent-optimized, citation-checked knowledge base. Orchestrates seven specialist subagents to produce a local-first {project}-dissection/ folder mapping architecture, modules, APIs, conventions, patterns, tests, security, and build system.",
+  "author": {
+    "name": "SufficientDaikon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/SufficientDaikon/dissector-agent",
+  "repository": "https://github.com/SufficientDaikon/dissector-agent",
+  "keywords": [
+    "codebase",
+    "reverse-engineering",
+    "documentation",
+    "knowledge-base",
+    "static-analysis",
+    "multi-agent",
+    "agents",
+    "citations"
+  ]
+}

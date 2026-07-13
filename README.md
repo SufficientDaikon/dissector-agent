@@ -1,553 +1,186 @@
-# 🔬 Dissector Agent
+# 🔬 Dissector
 
-**A Copilot CLI agent that reverse-engineers any codebase into comprehensive, organized documentation through 13 systematic analysis phases.**
+**A Claude Code multi-agent system that reverse-engineers any codebase into an agent-optimized knowledge base.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Copilot CLI](https://img.shields.io/badge/Copilot_CLI-Agent-purple.svg)](#prerequisites)
-[![Model: claude-opus-4.6](https://img.shields.io/badge/Model-claude--opus--4.6-orange.svg)](#configuration)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-Multi--Agent_System-orange.svg)](https://code.claude.com/docs)
+
+Point it at a repository and it produces a `{project}-dissection/` folder — a complete, machine-parseable map of the codebase (architecture, modules, APIs, conventions, patterns, tests, build system, dependencies) that another AI agent can load to understand the project without re-scanning it, extend it safely, rebuild it from scratch, or keep it maintained as the code evolves.
 
 ---
 
-## Hero Summary
+## Why agent-optimized output?
 
-The Dissector Agent is a **GitHub Copilot CLI custom agent** that takes a filesystem path to any codebase and autonomously produces a complete documentation folder covering architecture, design patterns, coding conventions, API references, testing patterns, security practices, build systems, dependencies, and actionable contribution/fork guides. It works with any programming language and produces **17+ interlinked markdown documents** — no human interaction required after invocation.
+Traditional generated docs are written for humans. Dissector's output is written for **agents**:
 
----
+- **Markdown + YAML frontmatter** — the format every agent runtime already navigates (the same convention as `llms.txt`, `AGENTS.md`, `CLAUDE.md`, `SKILL.md`), substantially cheaper in tokens than JSON or XML, and line-oriented so it survives chunked reads, greps cleanly, and git-diffs minimally.
+- **Progressive disclosure** — a small `index.md` root (always cheap to load) links to focused per-domain and per-module files, each 200–600 lines. Agents load only what they need.
+- **Greppable citations** — every factual claim carries an own-line token like `cite: src/parser/index.ts#L18-L31 symbol: parse`, so `rg 'src/parser/'` over the KB finds every claim about a file.
+- **Deterministic and diffable** — sorted lists, stable path-derived IDs, volatile metadata confined to `manifest.yaml`. Regenerating from unchanged sources produces near-identical bytes.
+- **Staleness-aware** — `manifest.yaml` records which source globs each KB file covers plus content hashes, so after a code change you can compute exactly which KB files are dirty and regenerate only those.
 
-## Visual Overview
+## How it works
+
+Dissector is not one agent — it's an orchestrated system of seven. A monolithic prompt analyzing a whole codebase in one context window runs out of room; Dissector gives each analysis domain a fresh context window and runs the middle of the pipeline in parallel:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     YOU (Developer)                          │
-│                                                             │
-│   > @dissector Dissect C:\projects\my-app                   │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   DISSECTOR AGENT                            │
-│                                                             │
-│  Phase  1: Discovery ─────── Scan file tree, detect langs   │
-│  Phase  2: Structure ─────── Map directories & modules      │
-│  Phase  3: Tech Stack ────── Frameworks, tools, CI/CD       │
-│  Phase  4: Conventions ───── Reverse-engineer style guide   │
-│  Phase  5: Patterns ─────── Design patterns & idioms        │
-│  Phase  6: APIs ──────────── Public interfaces & endpoints  │
-│  Phase  7: Testing ──────── Test framework & patterns       │
-│  Phase  8: Error Handling ── Error types & logging          │
-│  Phase  9: Security/Perf ── Auth, caching, bottlenecks     │
-│  Phase 10: Dependencies ─── Every dep with purpose          │
-│  Phase 11: Build System ─── Build, CI/CD, deployment        │
-│  Phase 12: Synthesis ────── Guides, glossary, examples      │
-│  Phase 13: Output ────────── Write 17+ docs to folder       │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│              "{project-name} dissection" FOLDER              │
-│                                                             │
-│  README.md ──────────── Master index & project overview     │
-│  glossary.md ────────── Domain-specific terms               │
-│  tech-stack.md ──────── Languages, frameworks, tools        │
-│  testing-patterns.md ── Test framework, fixtures, mocks     │
-│  error-handling.md ──── Error types, logging, recovery      │
-│  build-system.md ────── Build tools, CI/CD, deployment      │
-│  dependencies.md ────── Every dependency categorized        │
-│  security-patterns.md ─ Auth, validation, secrets mgmt      │
-│  performance-patterns.md ─ Caching, lazy loading, pooling   │
-│  architecture/ ──────── Architecture overview + module map  │
-│  patterns/ ──────────── Design patterns with code citations │
-│  conventions/ ────────── Naming, formatting, imports        │
-│  api-reference/ ─────── Exports, endpoints, CLI commands    │
-│  best-practices/ ────── Observed practices as rules         │
-│  contribution-guide/ ── Dev setup, coding standards, PRs    │
-│  fork-guide/ ────────── Module classification, extensions   │
-│  examples/ ──────────── Code examples organized by concept  │
-└─────────────────────────────────────────────────────────────┘
+/dissect <path>          (or: claude --agent dissector)
+        │
+        ▼
+ORCHESTRATOR — validates input, resolves project name, coordinates; holds
+        │      only briefs and manifests, never raw source
+        │
+        ├─ Stage 1  dissection-scout             discovery + structure  →  Recon Brief
+        │
+        ├─ Stage 2  (four specialists IN PARALLEL, disjoint output files)
+        │     ├─ dissection-stack-auditor         tech stack, dependencies, build/CI
+        │     ├─ dissection-style-analyst         conventions, design patterns
+        │     ├─ dissection-interface-documenter  APIs, symbol map, error handling
+        │     └─ dissection-quality-auditor       testing, security, performance
+        │
+        ├─ Stage 3  dissection-synthesist         guides, glossary, root index
+        │
+        └─ Stage 4  manifest.yaml, link verification, completion summary
 ```
 
----
+Each specialist writes its knowledge-base files directly and returns only a compact manifest, so the orchestrator's context stays small no matter how big the target codebase is. The classic 13-phase Dissector methodology (discovery → structure → tech stack → conventions → patterns → APIs → testing → error handling → security & performance → dependencies → build system → synthesis → output) is preserved — redistributed across the specialists.
 
-## What's Included
+## What's included
 
-| File | Description |
-|------|-------------|
-| [`agents/dissector.agent.md`](agents/dissector.agent.md) | The agent profile — 1,790 lines of structured instructions covering 13 analysis phases, error handling, secret redaction, and output specifications |
-| [`docs/index.html`](docs/index.html) | Self-contained HTML documentation website with dark/light mode, syntax highlighting, and copy-to-clipboard |
-| [`install.ps1`](install.ps1) | One-click installer for Windows (PowerShell) |
-| [`install.sh`](install.sh) | One-click installer for macOS/Linux (Bash) |
-| [`README.md`](README.md) | This file — complete usage guide |
-| [`LICENSE`](LICENSE) | MIT License |
-
----
-
-## Prerequisites
-
-Before using the Dissector agent, you need:
-
-1. **GitHub Copilot CLI** — The `github-copilot-cli` extension for VS Code, or the standalone Copilot CLI tool
-   - Install: [GitHub Copilot CLI docs](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
-   - Verify: Run `copilot --version` in your terminal
-
-2. **VS Code with Copilot Chat** (recommended) — The agent works best in the VS Code Copilot Chat panel
-   - Install the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension
-   - Install the [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension
-
-3. **A Copilot subscription** — Individual, Business, or Enterprise tier
-   - The agent uses the `claude-opus-4.6` model for maximum analysis quality
-
-4. **A codebase to analyze** — Any directory containing source code files
-
----
+| Component | File | Role |
+|---|---|---|
+| `/dissect` command | `.claude/commands/dissect.md` | Primary entry point |
+| `dissect` skill | `.claude/skills/dissect/SKILL.md` | The orchestration playbook |
+| `dissection-standards` skill | `.claude/skills/dissection-standards/SKILL.md` | Shared methodology + KB format spec, preloaded into every specialist |
+| `dissector` agent | `.claude/agents/dissector.md` | Orchestrator for `claude --agent dissector` |
+| 6 specialist agents | `.claude/agents/dissection-*.md` | Scout, stack auditor, style analyst, interface documenter, quality auditor, synthesist |
+| write-guard hook (plugin install) | `hooks/hooks.json` + `scripts/write-guard.sh` | `PreToolUse` guard shipped with the plugin: agents may only write inside the `*-dissection/` output folder |
+| plugin manifest | `.claude-plugin/plugin.json` + `marketplace.json` | Packages the above as an installable, self-hosted Claude Code plugin |
 
 ## Installation
 
-### Option A: One-Click Install (Recommended)
+**Preferred — Claude Code plugin (versioned, auto-updating, ships the write-guard hook):** from any Claude Code session,
 
-**Windows (PowerShell):**
+```
+/plugin marketplace add SufficientDaikon/dissector-agent
+/plugin install dissector@dissector-marketplace
+```
 
+This installs the seven agents, both skills, the `/dissect` command, and the `PreToolUse` write-guard hook (see [Security](#security)) as a semver-tagged bundle you can update in place. For a team, check the plugin into the repo's project settings so every collaborator gets it automatically.
+
+**Zero-install (project-local):** clone this repo and start Claude Code inside it — the `.claude/` directory is picked up automatically and `/dissect` is available in that session. No plugin install needed.
+
+**User-level script install (fallback for offline / no-plugin setups):**
+
+macOS/Linux:
+```bash
+chmod +x install.sh && ./install.sh
+```
+
+Windows (PowerShell):
 ```powershell
-# Clone the repository
-git clone https://github.com/SufficientDaikon/dissector-agent.git
-
-# Run the installer
-cd dissector-agent
 .\install.ps1
 ```
 
-**macOS / Linux (Bash):**
+This copies the agents, skills, and command into `~/.claude/`. Prerequisite: the [Claude Code CLI](https://code.claude.com/docs).
+
+## Usage
+
+Primary — from any Claude Code session:
+
+```
+/dissect /path/to/codebase
+```
+
+Or a dedicated session:
 
 ```bash
-# Clone the repository
-git clone https://github.com/SufficientDaikon/dissector-agent.git
-
-# Run the installer
-cd dissector-agent
-chmod +x install.sh
-./install.sh
+claude --agent dissector
 ```
 
-**Expected output:**
+Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`). On a re-run against the same project, an existing dissection folder (identified by a `manifest.yaml` carrying `generator.name: dissector`) is overwritten after a warning; a same-named folder *without* that marker is never touched.
+
+## Output format
 
 ```
-🔬 Installing Dissector Agent...
-✅ Created ~/.copilot/agents/
-✅ Copied dissector.agent.md to ~/.copilot/agents/
-🎉 Installation complete!
-
-Installed files:
-  ~/.copilot/agents/dissector.agent.md
-
-To use: Open VS Code Copilot Chat and type:
-  @dissector Dissect /path/to/your/codebase
+{project}-dissection/
+├── index.md                # START HERE — root map, <200 lines, links to everything
+├── manifest.yaml           # machine index: coverage globs, source hashes, status
+├── architecture.md         # module graph, layers, entry points, detected patterns
+├── symbol-map.md           # ranked signature map of exported symbols
+├── tech-stack.md           # languages, frameworks, tooling (YAML inventories)
+├── dependencies.md         # every dependency: version, category, purpose
+├── build-and-test.md       # commands, CI pipelines, deployment, env vars
+├── conventions.md          # the implicit style guide, as rules with consistency %
+├── patterns.md             # design patterns & idioms with confidence grades
+├── errors.md               # error types, propagation, logging, recovery
+├── testing.md              # test framework, structure, how to add a test
+├── security.md             # observed auth/validation/secrets posture (redacted)
+├── performance.md          # caching, async, pooling, bottleneck risks
+├── glossary.md             # domain vocabulary
+├── AGENTS.md               # cross-tool entry point (Codex/Cursor/Copilot/Gemini/…)
+├── modules/<module-id>.md  # one file per module: purpose, files, exports, gotchas
+├── api/<module-id>.md      # public API per module: signatures + citations
+└── guides/
+    ├── extend.md           # recipes: add a feature/endpoint/test, conventions to follow
+    └── rebuild.md          # reconstruction map: build order, extension points, fork strategy
 ```
 
-### Option B: Manual Install
+`<module-id>` is the module's source path with each `/` replaced by a double hyphen `--` (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths — a single `/` never maps to a single `-`, so `src/foo-bar` and `src/foo/bar` never merge.
 
-```powershell
-# Create the agents directory if it doesn't exist
-mkdir -p ~/.copilot/agents/
+**How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), follow links as needed; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files. To make agents use the KB automatically, add a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` (e.g. `> See {project}-dissection/index.md for the codebase map`) — Dissector prints the exact snippet at the end of a run and never writes into your source tree itself.
 
-# Copy the agent file
-cp agents/dissector.agent.md ~/.copilot/agents/dissector.agent.md
-```
-
-### Verify Installation
-
-After installing, open VS Code and in the Copilot Chat panel type:
-
-```
-@dissector What can you do?
-```
-
-You should see the agent respond describing its 13-phase analysis capability.
-
----
-
-## Quick Start
-
-Three commands to get your first dissection:
-
-```bash
-# 1. Install the agent (if not already done)
-git clone https://github.com/SufficientDaikon/dissector-agent.git && cd dissector-agent && ./install.sh
-
-# 2. Open VS Code in any project
-code /path/to/any/project
-
-# 3. In Copilot Chat, run:
-#    @dissector Dissect this codebase
-```
-
-That's it. The agent runs all 13 phases autonomously and produces a `"{project-name} dissection"` folder in your working directory.
-
----
-
-## Detailed Usage
-
-### Basic Dissection
-
-Provide an absolute or relative path to any codebase:
-
-```
-@dissector Dissect C:\Users\dev\projects\my-app
-```
-
-```
-@dissector Analyze /home/user/repos/express
-```
-
-```
-@dissector Reverse-engineer this codebase: D:\work\api-server
-```
-
-Or if you're already in the project directory:
-
-```
-@dissector Dissect this codebase
-```
-
-### What Happens During a Dissection
-
-The agent prints progress as it works through 13 phases:
-
-```
-[Phase 1/13] Discovery... (scanning file tree)
-[Phase 1/13] Discovery complete — 342 source files in 3 languages (TypeScript 68%)
-[Phase 2/13] Structure... (mapping directory architecture)
-[Phase 3/13] Tech Stack... (identifying frameworks and tools)
-...
-[Phase 13/13] Output... (writing 18 documents to "my-app dissection")
-
-✅ Dissection complete!
-
-📂 Output: C:\Users\dev\projects\my-app dissection
-📊 Files analyzed: 342 of 487 total
-🗣️ Languages: TypeScript, JavaScript, Python
-📝 Documents generated: 18
-📐 Sampling: Exhaustive (all files analyzed)
-⏱️ Phases completed: 13/13
-```
-
-### Understanding the Output
-
-After a dissection, you'll find a folder named `"{project-name} dissection"` in your current directory. Here's how to navigate it:
-
-| If you want to... | Read this file |
-|--------------------|----------------|
-| Understand the project's architecture | `architecture/README.md` |
-| Learn the coding style before contributing | `conventions/README.md` |
-| Set up a development environment | `contribution-guide/README.md` |
-| Fork and customize the project | `fork-guide/README.md` |
-| Understand every dependency | `dependencies.md` |
-| Learn the testing patterns | `testing-patterns.md` |
-| Find API endpoints or exports | `api-reference/README.md` |
-| Review security practices | `security-patterns.md` |
-| Look up domain terminology | `glossary.md` |
-
-### Re-Running a Dissection
-
-The agent is **idempotent**. If you run it again on the same codebase:
-
-- If a previous `"{project-name} dissection"` folder exists with a `.dissection-metadata` file, the agent will **overwrite** it
-- If a folder with that name exists but is NOT a previous dissection, the agent will **refuse to overwrite** and ask you to rename it
-
----
-
-## Prompts & Examples
-
-### 🟢 Getting Started
-
-**Dissect a local project:**
-
-> `@dissector Dissect C:\Users\dev\projects\my-express-api`
-
-**Expected result:** A `"my-express-api dissection"` folder with 17+ markdown files covering architecture, patterns, conventions, APIs, testing, security, build system, and more.
-
----
-
-**Dissect the current workspace:**
-
-> `@dissector Analyze this codebase`
-
-**Expected result:** The agent detects the current workspace root and produces a dissection folder in the working directory.
-
----
-
-**Dissect a specific subdirectory:**
-
-> `@dissector Reverse-engineer the backend: /home/user/monorepo/packages/api`
-
-**Expected result:** The agent scopes its analysis to only the `packages/api` directory and produces an `"api dissection"` folder.
-
----
-
-### 🔵 Common Workflows
-
-**Onboard to a new team's codebase:**
-
-> `@dissector Dissect /home/dev/company/main-service`
-
-Then open `contribution-guide/README.md` first — it contains dev setup, coding standards, and how to add features.
-
----
-
-**Evaluate a library before adopting it:**
-
-> `@dissector Dissect ~/repos/some-open-source-lib`
-
-Then read `tech-stack.md` and `architecture/README.md` to understand its dependencies and design.
-
----
-
-**Prepare for a code review:**
-
-> `@dissector Dissect D:\work\feature-branch-checkout`
-
-Then check `conventions/README.md` and `patterns/README.md` to understand the project's established patterns.
-
----
-
-**Document a legacy codebase:**
-
-> `@dissector Dissect C:\legacy\old-java-monolith`
-
-The agent handles any language and produces structured documentation even for projects with no existing docs.
-
----
-
-**Analyze a monorepo:**
-
-> `@dissector Dissect /home/user/my-monorepo`
-
-The agent detects monorepo structures (Lerna, pnpm workspaces, Cargo workspaces, etc.) and documents sub-projects as separate modules.
-
----
-
-### 🟣 Advanced Usage
-
-**Dissect after cloning an unfamiliar open-source project:**
-
-```bash
-git clone https://github.com/expressjs/express.git
-cd express
-# In Copilot Chat:
-# @dissector Dissect this codebase
-```
-
-**Expected result:** A complete `"express dissection"` folder documenting Express.js internals — middleware pipeline, router, request/response extensions, and more.
-
----
-
-**Chain dissections for comparison:**
-
-Dissect two codebases separately, then compare their architecture documents manually:
-
-```
-@dissector Dissect ~/repos/project-a
-# (wait for completion)
-@dissector Dissect ~/repos/project-b
-# Then compare: project-a dissection/architecture/ vs project-b dissection/architecture/
-```
-
----
-
-**Use dissection output as context for other agents:**
-
-After dissecting a codebase, reference the output in other Copilot conversations:
-
-```
-@workspace Based on the architecture documented in "my-app dissection/architecture/README.md",
-help me add a new microservice that follows the same patterns.
-```
-
----
-
-### 🔴 Troubleshooting
-
-**Agent says "Path does not exist":**
-
-> Make sure you're providing an absolute path or the project is in your current workspace. Try:
-> `@dissector Dissect C:\exact\path\to\project`
-
----
-
-**Dissection seems incomplete (says PARTIAL):**
-
-> The agent hit its context window limit. This happens with very large codebases (5000+ files). The output folder will have a `[PARTIAL]` marker in the README showing which phases completed. Simply run the dissector again — it's idempotent and will overwrite the partial output.
-
----
+Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest, plus a deterministic output-side secret scan in Stage 4), machine-verifies every `cite:` token and reports `N/M verified` in the manifest, never crashes on unreadable files (skips and logs them), and refuses to overwrite non-dissection folders or a dissection of a different codebase. On the **plugin install**, the write-guard hook additionally enforces at the harness level that agents write only inside the `*-dissection/` output folder; the zero-install and script-install paths rely instead on the agents' `permissionMode: acceptEdits` and the in-prompt rule that analyzed content is data, never instructions (see [Security](#security)).
 
 ## Configuration
 
-### Model Selection
+**Models are not hard-coded.** No agent pins a `model:` — every specialist inherits your session's model. To change what runs the analysis:
 
-The agent is configured to use `claude-opus-4.6` for maximum analysis quality. To change the model, edit `dissector.agent.md` and modify the `model` field in the YAML frontmatter:
+- Set your session model (`/model` in Claude Code) — specialists follow it.
+- Route all subagents to a specific model: set the `CLAUDE_CODE_SUBAGENT_MODEL` environment variable.
+- Pin per-role models by adding a `model:` line to any agent's frontmatter (e.g. a cheaper model for `dissection-stack-auditor`, a stronger one for `dissection-synthesist`).
 
-```yaml
----
-model: claude-opus-4.6  # Change to claude-sonnet-4 for faster analysis
----
-```
+Reasoning `effort` per agent ships with task-shaped defaults (`low` for the mechanical stack audit, `high` for pattern analysis and synthesis) — also just frontmatter, edit freely.
 
-**Model tradeoffs:**
+Sampling adapts automatically to codebase size: under 500 source files every file is read; 500–2,000 everything is read with repetitive patterns summarized; over 2,000 a stratified sample (all entry points/configs/APIs/tests exhaustively, proportional sampling elsewhere) is used and disclosed in `index.md` and `manifest.yaml`.
 
-| Model | Speed | Quality | Best For |
-|-------|-------|---------|----------|
-| `claude-opus-4.6` | Slower | Highest | Thorough analysis, large codebases |
-| `claude-sonnet-4` | Faster | High | Quick dissections, smaller codebases |
+**Scale envelope.** Dissector is tested on small and medium repositories (under ~2,000 source files). Tier-3 stratified sampling engages above 2,000 source files — the KB becomes a disclosed sample, not an exhaustive map. Very large monorepos should be dissected **per-package**: point `/dissect` at a package directory rather than the monorepo root. At Stage 0, Dissector prints the source-file count and a rough token estimate, and above 2,000 source files it pauses to let you confirm the whole-tree run or hand it a subdirectory instead.
 
-### Sampling Tiers
+## Data flow
 
-The agent automatically selects a sampling strategy based on codebase size:
+Dissector runs entirely through **your configured Claude Code backend** — the Anthropic API, Amazon Bedrock, or Google Vertex AI, whichever your Claude Code is set to. Source files are read locally and sent to that model backend for analysis exactly as any Claude Code session would; **nothing else leaves your machine**, there is no Dissector server, telemetry, or third-party call. The generated knowledge base is written to a local `{project}-dissection/` folder and stays on disk — it is never uploaded anywhere by the tool. If your organization requires Bedrock/Vertex or zero-retention routing, configure Claude Code accordingly and Dissector inherits it.
 
-| Source Files | Strategy | Coverage |
-|-------------|----------|----------|
-| < 500 | Exhaustive | 100% of files |
-| 500–2,000 | Full + Summarize | 100% analyzed, repetitive patterns summarized |
-| > 2,000 | Stratified Sampling | 100% of structural files + 15% sample of each module |
+## Where should the KB live? (governance)
 
-No configuration needed — this is automatic.
+The dissection is a concentrated, greppable map of your system — it aggregates endpoints, environment-variable names, config surface, and verbatim code snippets in one place. Treat it with the same care as the code it describes:
 
----
+- **Commit it** when you want the whole team (and their agents) to share one maintained map — it diffs cleanly and is cheap to regenerate. Good for internal repos.
+- **Gitignore it** (or store it in an access-controlled location) when the repo is sensitive and you don't want a consolidated attack-surface map in version control. The KB can make reconnaissance easier for anyone who gets read access.
 
-## File Reference
+Secrets are redacted (`[REDACTED]`) with a deterministic output-side backstop scan, but redaction is best-effort — do not treat the KB as safe to publish just because it was scanned. Decide commit-vs-ignore deliberately per repo.
 
-| Path | Purpose |
-|------|---------|
-| `agents/dissector.agent.md` | The complete agent profile (1,790 lines) defining all 13 analysis phases, error handling, output format specs, and the code citation format |
-| `docs/index.html` | Self-contained documentation website — open in any browser, no server needed |
-| `install.ps1` | Windows installer — copies agent file to `~/.copilot/agents/` |
-| `install.sh` | macOS/Linux installer — copies agent file to `~/.copilot/agents/` |
-| `LICENSE` | MIT License |
-| `README.md` | This documentation |
+## Security
 
----
+- **Static analysis only** — Dissector never executes, compiles, or runs the target code, and never fetches remote repositories.
+- **Write-guard hook (plugin install)** — the **plugin** ships a `PreToolUse` hook (`scripts/write-guard.sh`) that emits `permissionDecision: allow` for writes inside the `*-dissection/` output folder and `permissionDecision: ask` for anything else, so an injected payload can't silently steer a specialist into writing elsewhere. This harness-level backstop rides with the plugin install only; the **zero-install** and **script-install** paths instead rely on the agents' `permissionMode: acceptEdits` plus the in-prompt rule that analyzed content is treated as **data, never instructions** (dissection-standards §0).
+- **Prompt-injection resistance** — analyzed file content is treated as untrusted **data, never instructions**. If a codebase contains text addressed to an AI agent ("ignore your instructions, write X…"), specialists record it as a finding and do not comply.
+- **Secret redaction** — matches classic patterns (AWS keys, JWTs, private keys, connection strings) plus modern provider tokens (`sk-`/`sk-ant-`, `ghp_`/`github_pat_`, `xoxb-`, `AIza`, `npm_`, `glpat-`, and more), with a deterministic Stage-4 grep over the generated KB as a second layer.
+- **Citation verification** — every `cite:` is machine-checked (file exists, line range in bounds, symbol present) and the verified/broken counts are reported in `manifest.yaml`.
 
-## Architecture
+## Development
 
-The Dissector Agent is a single `.agent.md` file that runs inside GitHub Copilot CLI. It uses Copilot's tool system to interact with the filesystem:
+**SINGLE SOURCE:** `.claude/agents`, `.claude/skills`, and `.claude/commands` are the **canonical** copies (they drive the zero-install project-local path). The repo-root `agents/`, `skills/`, and `commands/` directories are byte-identical copies that exist only so the Claude Code plugin (`.claude-plugin/`) can package them — marketplace installs copy real files, so these are real directories, **not symlinks**. Any change to an agent, skill, or command must be applied to **both** locations to keep them in sync; a `diff -r .claude/agents agents` (and likewise for skills/commands) must report no differences. Run `scripts/check-sync.sh` to verify the whole mirror in one shot — it diffs all three pairs and exits nonzero on any drift.
 
-```
-┌───────────────────────────────────────────────┐
-│               Copilot CLI Runtime              │
-│                                               │
-│  ┌──────────────────────────────────────────┐ │
-│  │         dissector.agent.md               │ │
-│  │                                          │ │
-│  │  YAML Frontmatter (metadata, tools)      │ │
-│  │           │                              │ │
-│  │  System Prompt (1,750+ lines)            │ │
-│  │    ├── Core Identity                     │ │
-│  │    ├── Input Validation                  │ │
-│  │    ├── 13 Analysis Phases                │ │
-│  │    ├── Output Document Specs             │ │
-│  │    ├── Error Handling (26 edge cases)    │ │
-│  │    ├── Secret Redaction Protocol         │ │
-│  │    └── Tool Usage Guide                  │ │
-│  └──────────┬───────────────────────────────┘ │
-│             │ Uses tools:                     │
-│  ┌──────────▼───────────────────────────────┐ │
-│  │  glob ─── Find files by pattern          │ │
-│  │  grep ─── Search file contents           │ │
-│  │  read ─── Read file with line numbers    │ │
-│  │  create ─ Write output documents         │ │
-│  │  powershell ─ File system operations     │ │
-│  │  task ─── Delegate to sub-agents         │ │
-│  └──────────────────────────────────────────┘ │
-└───────────────────────────────────────────────┘
-```
+## FAQ
 
-### How It Works
+**Why no persistent agent memory?** Claude Code subagents support a `memory:` field, but Dissector deliberately doesn't use it — dissections must be deterministic (same code in, same facts out), and memory from a previous run leaking into a new one would break that. Idempotency is handled by `manifest.yaml` instead.
 
-1. **You invoke the agent** with a codebase path
-2. **The agent validates** the path exists, is a directory, and is not empty
-3. **13 phases execute sequentially** — each phase reads code files and builds analysis data
-4. **Phase 13 writes output** — all documents are written to a `"{project-name} dissection"` folder
-5. **Every code excerpt is cited** with file path and line numbers back to the original source
+**What is `manifest.yaml` for?** Three things: it marks the folder as a dissection (safe-overwrite check), records what was analyzed and how (counts, sampling tier, skipped files, redaction flag), and maps every KB file to the source globs and content hashes it was derived from (staleness detection).
 
-### Key Design Decisions
+**A specialist failed mid-run — now what?** The run continues; the result is marked partial (`status.complete: false` in the manifest, a completion checklist in `index.md`) and the summary tells you which specialist to re-run. Re-running `/dissect` regenerates the whole dissection.
 
-- **Static analysis only** — The agent never executes, compiles, or runs your code
-- **Autonomous** — Once started, it runs all 13 phases without asking questions
-- **Resilient** — Unreadable files, encoding errors, and binary files are skipped gracefully
-- **Honest** — Documents what IS, not what should be; notes discrepancies
-- **Idempotent** — Safe to re-run; detects and overwrites previous dissections
-
----
-
-## Troubleshooting
-
-### "Agent not found" when typing `@dissector`
-
-**Cause:** The agent file is not in the correct directory.
-
-**Fix:** Verify the file exists:
-
-```powershell
-# Windows
-Test-Path "$env:USERPROFILE\.copilot\agents\dissector.agent.md"
-
-# macOS/Linux
-test -f ~/.copilot/agents/dissector.agent.md && echo "Found" || echo "Not found"
-```
-
-If not found, re-run the installer.
-
-### Dissection takes a very long time
-
-**Cause:** Large codebases (2000+ files) require extensive analysis.
-
-**Fix:** The agent automatically uses stratified sampling for large codebases. If you need faster results, edit the agent to use `claude-sonnet-4` instead of `claude-opus-4.6`.
-
-### "Context window exhaustion" / Partial output
-
-**Cause:** Very large codebases may exhaust the LLM's context window.
-
-**Fix:** The agent automatically executes its Context Exhaustion Protocol — writing all completed documents and marking the output as `[PARTIAL]`. You can re-run the agent on the same codebase to get a fresh, complete analysis.
-
-### Output folder "already exists" error
-
-**Cause:** A folder with the expected output name exists but was NOT created by the dissector.
-
-**Fix:** Rename or move the conflicting folder, then re-run the agent.
-
-### Binary files or images appear in analysis
-
-**Cause:** Unexpected file extensions.
-
-**Fix:** The agent automatically excludes known binary formats. If you see issues, the file may have an unusual extension. The agent logs skipped files in `.dissection-metadata`.
-
----
-
-## Contributing
-
-### Modifying the Agent
-
-The agent is a single markdown file. To modify its behavior:
-
-1. Edit `~/.copilot/agents/dissector.agent.md`
-2. Changes take effect immediately — no build step required
-3. Test by running `@dissector Dissect /path/to/small/test/project`
-
-### Adding a New Analysis Phase
-
-1. Add the phase definition in Section 6 (between the existing phases or after Phase 12)
-2. Update the phase count in all progress messages
-3. Add the output document specification in Section 7
-4. Update the output folder structure in Phase 13
-5. Update the README template in Phase 12
-
-### Reporting Issues
-
-Open an issue at [github.com/SufficientDaikon/dissector-agent/issues](https://github.com/SufficientDaikon/dissector-agent/issues) with:
-
-- The codebase size (approximate file count)
-- The error message or unexpected behavior
-- Your Copilot CLI version (`copilot --version`)
-
----
+**How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the staleness data in `manifest.yaml` to identify dirty files and ask Claude to re-run just the owning specialist.
 
 ## License
 
-[MIT](LICENSE) — use it, modify it, share it.
+MIT — see [LICENSE](LICENSE).
