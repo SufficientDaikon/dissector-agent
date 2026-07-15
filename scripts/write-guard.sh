@@ -23,6 +23,16 @@
 
 set -u
 
+# Interactive-shell / no-stdin guard. Claude Code always PIPES the tool-call JSON
+# to this hook's stdin, so in normal operation stdin is a pipe. If stdin is an
+# interactive terminal instead (e.g. on Windows, Git Bash launching the hook as
+# `bash --login -i`, which pops a console and leaves the `cat` below blocking on
+# the keyboard forever), there is no JSON to guard — pass through immediately so
+# we never hang a visible window. Harmless in the normal path: a pipe is not a tty.
+if [ -t 0 ]; then
+  exit 0
+fi
+
 # jq missing -> pass through, do not block the session.
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
