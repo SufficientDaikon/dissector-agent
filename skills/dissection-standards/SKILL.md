@@ -47,9 +47,21 @@ description: <one sentence — what an agent learns from this file>
 source_roots: [src/parser]        # source dirs this file describes
 covers: ["src/parser/**"]         # source globs this file's facts derive from
 public_exports: [Lexer, parse]    # type: module/api
-depends_on: [modules/src-ast]     # KB ids or "npm:pkg@ver" — type: module
+depends_on: [modules/src-ast]     # KB ids or "npm:pkg@ver" — type: module ONLY (dependency edge)
+related: [api/src-parser, patterns]  # KB ids of associated concepts — ANY type (see §3a)
 ---
 ```
+
+**`type`, `id`, `title`, and `description` are REQUIRED on every KB file** — never omit `title` or `description`. They are how a consuming agent previews a file (and how the index is built) without reading the body, so a missing one is a defect. Only the type-specific keys (`source_roots`, `covers`, `public_exports`, `depends_on`, `related`) are conditional.
+
+## 3a. Concept cross-references — the KB is a graph, not a folder
+
+The KB is a **graph of concepts**, and a consuming agent navigates it by hopping concept→concept — not only through `index.md`. Every KB file must expose its edges to sibling KB files so that traversal is possible from any node. This is the second machine affordance after `cite:` (which points at *source*; these edges point at *other KB files*).
+
+- **`related:` frontmatter (all types).** A sorted list of KB ids (output-relative path minus `.md`, e.g. `api/src-parser`, `patterns`, `security`) naming the concepts this file is associated with. Distinct from `depends_on`, which is the narrower *code-dependency* edge and stays module-only. Use `related:` for associative links: a `modules/<m>` ↔ its `api/<m>`; a module ↔ the `patterns`/`security`/`errors` entries that discuss it; a glossary term ↔ the module that implements it. Greppable: `grep -rn '^related:'` enumerates the whole graph. Omit the key if a file genuinely has no siblings (rare).
+- **`## Related` body section (every file except the root `index.md`).** End the file with a section titled exactly `## Related`, containing a sorted bullet list of inline markdown links to those same siblings — `- [<title>](<relative-path>.md) — <≤6-word reason>`. Relative path from *this* file's directory (e.g. from `api/foo.md` to a module: `../modules/foo.md`). Every link must resolve; the orchestrator's Stage-4 check tests them. This mirrors `related:` (plus `depends_on` for modules) into human/visualizer-navigable form and makes the KB a valid linked bundle for any graph consumer.
+- **Determinism:** sort both `related:` and the `## Related` bullets lexicographically by id; no volatile data. Reciprocity is expected but not mandatory — link A→B whenever B is genuinely relevant to A; do not fabricate edges to force symmetry.
+- Only the root `index.md` (id `index`) is exempt from `## Related` — it already links every file. This exemption is keyed on the **file id**, NOT the `type` value: `symbol-map.md` is also `type: index` but is NOT exempt and still gets a `## Related` section. The synthesist writes index.md's listing links as before.
 
 Body rules:
 - Terse declarative prose. No filler, no "as we can see", no marketing tone.
@@ -62,15 +74,25 @@ Body rules:
 
 ## 4. Citations
 
-Every factual claim about code carries an own-line cite token:
+**This is the KB's single most important machine affordance — non-negotiable.** Consuming agents locate source by running `grep -rn 'cite:'` over the KB, so a claim without a `cite:` token is invisible to them. Every factual claim about code carries a cite token whose literal prefix is `cite:` followed by a `#Lstart-Lend` line range. There are exactly two accepted forms, both greppable by the `cite:` prefix:
+
+**Form A — own-line token** (the default; use everywhere in prose and in every non-YAML context):
 
 ```
 cite: src/parser/index.ts#L18-L31 symbol: parse
 ```
 
-- Path is CODEBASE_PATH-relative, forward slashes. `#Lstart-Lend` are real line numbers.
-- `symbol:` names the enclosing function/class/const when one exists (enables re-anchoring after line drift); omit if none.
-- Optionally follow with a ≤10-line fenced snippet (exact verbatim copy, language-tagged) when the code itself carries information the prose can't.
+**Form B — YAML-record field** (use ONLY inside a fenced ```yaml block, as the last key of a mapping, so a structured record like an export row can carry its own cite):
+
+```yaml
+exports:
+  - {name: parse, kind: function, signature: "parse(src) -> AST", cite: "src/parser/index.ts#L18-L31"}
+```
+
+- **FORBIDDEN — never emit these.** Inline shorthand such as `src/parser/index.ts:18`, `(index.ts:18-31)`, `index.ts L18`, or a bare `path:line` reference is **not a cite**: it has no `cite:` prefix and no `#L`, so the verifier and every consuming agent are blind to it. If you catch yourself writing `path:line`, convert it to `cite: path#Lstart-Lend`.
+- Path is CODEBASE_PATH-relative, forward slashes. `#Lstart-Lend` are real 1-based line numbers; `Lend` must be ≤ the file's last line (do not cite one past EOF).
+- `symbol:` (own-line form) or the record's identity (YAML form) names the enclosing definition to enable re-anchoring after line drift. **Use the bare defined name** as it appears at the `def`/`class`/`func`/`const` keyword — `symbol: send`, not `symbol: HTTPAdapter.send` — because the verifier greps the cited line range for that literal token. `Class.method` dotted names are tolerated (the verifier matches the trailing `.` component) but the bare name is safest. Omit `symbol:` if no named definition encloses the range.
+- Optionally follow an own-line cite with a ≤10-line fenced snippet (exact verbatim copy, language-tagged) when the code itself carries information the prose can't.
 - Repeated pattern across many files → cite 2–3 representatives, state the count.
 - Truncated large file → append `(truncated, file {X}KB)`.
 
@@ -99,12 +121,18 @@ Never crash, never stop early: unreadable files, encoding errors, weird structur
 
 ## 7. Manifest return contract
 
-Your final message is consumed by the orchestrator, not a human. Return EXACTLY this structure and nothing else:
+Your final message is consumed by a program, not a human — it is parsed as YAML. Three hard rules:
+
+1. **Return the manifest as your final chat message.** NEVER write it to a file. Do not create `manifest.md`, `manifest-<agent>.md`, or any file for it — the orchestrator owns the only on-disk manifest (`manifest.yaml`). Writing a manifest file pollutes the KB and is a defect.
+2. **The top-level key is exactly `manifest:`** — not `dissection_manifest`, not `dissection_manifest:`, not a prose summary. A prose paragraph is a rejected manifest.
+3. **Emit every key below with these exact names and shapes.** `phases` is a list of integers (`[3, 10, 11]`), never a string. `status` is exactly `complete` or `partial`. `files_written` is a list of `{path, covers}` mappings where `path` is OUTPUT_PATH-relative (e.g. `tech-stack.md`, `modules/src--foo.md`) — never an absolute path, never a bare string.
+
+Return EXACTLY this structure and nothing else after your KB files are written:
 
 ```yaml
 manifest:
   agent: <your agent name>
-  phases: [<phase numbers covered>]
+  phases: [<phase integers covered>]
   status: complete | partial
   missing: []            # what's absent if partial
   files_written:
@@ -116,3 +144,5 @@ manifest:
   skipped_files: []      # [{path, reason}]
   secrets_redacted: false
 ```
+
+(The scout is the one exception that returns two blocks: first its `recon_brief:` block, then this `manifest:` block — they are separate top-level YAML documents, never merged.)

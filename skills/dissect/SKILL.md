@@ -62,7 +62,8 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
    - Immediately write a **stub `OUTPUT_PATH/manifest.yaml`** so an interrupted run is recognizable and overwritable next time (Stage 4 overwrites it with the full manifest):
      ```yaml
      schema_version: "1.0"
-     generator: {name: dissector, version: 2.1.0}
+     spec: {okf: "0.1"}
+     generator: {name: dissector, version: 2.3.1}
      generated_from:
        path: <CODEBASE_PATH>
      status: {complete: false, phases_completed: 0}
@@ -128,7 +129,8 @@ Print `[Phase 13/13] Output — manifest, verification, summary...`
 1. **Write `OUTPUT_PATH/manifest.yaml`** — aggregate from the manifests, overwriting the Stage 0 stub:
 ```yaml
 schema_version: "1.0"
-generator: {name: dissector, version: 2.1.0}
+spec: {okf: "0.1"}                    # Open Knowledge Format v0.1-compatible bundle (superset: adds cite: source tokens + this manifest)
+generator: {name: dissector, version: 2.3.1}
 generated_from:
   path: <CODEBASE_PATH>
   commit: <git -C CODEBASE_PATH rev-parse HEAD, or null>
@@ -159,7 +161,11 @@ entries:                             # sorted by id; one per KB file from files_
    ```
    Fill `source_hashes` per entry (files matching that entry's `covers`). If the codebase is very large (>2,000 files), hash only entry-point/config/API files plus per-entry sampled files and note `source_hashes_partial: true`.
 3. **Output-side secret backstop** (one Bash grep pass over the generated KB — a deterministic safety net independent of what the specialists redacted): grep every `OUTPUT_PATH/**/*.md` for the modern token patterns, each **anchored** to a token-shaped value (word boundary + charset + length) so ordinary identifiers like `flask-cors`, `task-runner`, `npm_config_*`, or `disk-cache` never false-positive and corrupt the KB (same provider set as dissection-standards §5, expressed here as anchored regexes since this grep has no variable-name context to key off): `\bsk-(ant-)?[A-Za-z0-9_-]{20,}`, `\bgh[pos]_[A-Za-z0-9]{36}`, `\bgithub_pat_[A-Za-z0-9_]{22,}`, `\bxox[bps]-[A-Za-z0-9-]{10,}`, `\bAIza[0-9A-Za-z_-]{35}`, `\bnpm_[A-Za-z0-9]{36}`, `\bglpat-[A-Za-z0-9_-]{20,}`, `\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{20,}`, `\bdop_v1_[a-f0-9]{64}`, `\bshp(at|ss)_[a-fA-F0-9]{32}`, plus `AKIA[A-Z0-9]{16}`, `-----BEGIN [A-Z ]*PRIVATE KEY-----`, and JWT `eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*`. Any hit that is not an obvious placeholder → replace the matched value with `[REDACTED]` in that KB file (sed in place), set `status.secrets_redacted: true`, and report each redaction location in the summary. This catches secrets a specialist echoed into a snippet.
-4. **Citation verification pass** (deterministic, no LLM): scan every `cite:` token across all `OUTPUT_PATH/**/*.md`. Each token has the form `cite: <relpath>#L<start>-L<end> symbol: <name>` (symbol optional). For each: (a) `test -e "$CODEBASE_PATH/<relpath>"` — file exists; (b) `<end>` ≤ the file's line count (`wc -l`); (c) if a `symbol:` is given, `sed -n "<start>,<end>p"` of the file greps for the symbol name. A bash loop with `sed`/`grep` does all three. Record `citations.total` (tokens seen), `citations.verified` (tokens passing all checks), and `citations.broken` (list of `{cite, reason}` for failures). Broken cites are REPORTED, not silently dropped — leave the KB text as the specialist wrote it (the specialists self-verify per standards §4; this pass is the backstop and the trust metric).
+4. **Citation verification pass** (deterministic, no LLM): scan every `cite:` token across all `OUTPUT_PATH/**/*.md`. Tokens appear in **two accepted forms** (standards §4): own-line `cite: <relpath>#L<start>-L<end> symbol: <name>`, and a quoted YAML field `cite: "<relpath>#L<start>-L<end>"` inside a fenced record. Your parser MUST handle both, or it will falsely fail correct cites:
+   - **Strip surrounding quotes** from the captured `<relpath>` (and any trailing `"`/`,`/`}` from the YAML form) before `test -e`. A relpath beginning with `"` is a parse bug on your side, not a broken cite.
+   - **Symbol match is last-component and substring.** A `symbol:` may be a bare name (`send`) or dotted (`HTTPAdapter.send`); the source line at the `def`/`class` keyword contains only the bare name. So compare against the **trailing `.`-delimited component** (`send`) and treat the check as passing if that token appears anywhere in the cited range. Never fail a cite solely because the dotted class prefix is absent from the source line.
+   
+   For each token: (a) `test -e "$CODEBASE_PATH/<relpath>"` — file exists; (b) `<end>` ≤ the file's line count (`wc -l`); (c) if a `symbol:` is given, `sed -n "<start>,<end>p"` of the file contains the symbol's trailing component. A bash loop with `sed`/`grep` does all three. Record `citations.total` (tokens seen), `citations.verified` (tokens passing all checks), and `citations.broken` (list of `{cite, reason}` for genuine failures only). Broken cites are REPORTED, not silently dropped — leave the KB text as the specialist wrote it (the specialists self-verify per standards §4; this pass is the backstop and the trust metric). If your first pass reports an implausibly high broken rate (say >25%), suspect your own parser (quote-stripping or symbol-matching) before trusting the number.
 5. **Verify structure**: every `files_written` path exists; extract relative markdown links from each KB file and `test -e` them from the file's directory; index.md < 200 lines. Fix trivial breaks yourself (a broken link target → remove or correct the link); anything structural goes to `status.partial_files`.
 6. **Remove the lock**: `rm -f "$OUTPUT_PATH/.dissect-lock"`.
 7. **Print the completion summary**:

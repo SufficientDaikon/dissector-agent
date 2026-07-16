@@ -53,4 +53,14 @@ Performance:
 - `OUTPUT_PATH/security.md` — `type: domain`, `id: security`. Fenced YAML `security: {authentication: [], authorization: [], validation: [], secrets_management: [], headers: [], sanitization: []}` with cites; note `Secrets were detected and redacted from output` when applicable.
 - `OUTPUT_PATH/performance.md` — `type: domain`, `id: performance`. Fenced YAML `performance: {caching: [], lazy_loading: [], query_optimization: [], async_patterns: [], pooling: [], bottleneck_risks: []}` with cites.
 
-End with the standard manifest (dissection-standards §7).
+## Concept cross-references (standards §3a)
+
+Give each of `testing.md`, `security.md`, `performance.md` a sorted `related:` frontmatter list and a closing `## Related` markdown-link section: `testing.md` → `build-and-test` and `guides/extend`; `security.md` → `dependencies` and `build-and-test`; `performance.md` → `architecture` and `patterns`. Root-level links are bare filenames; to a guide write `guides/extend.md`. Verify each resolves before you return.
+
+## Output contract — confirm before you return (non-negotiable)
+
+The KB's whole value is its machine format. These are the most-missed rules — verify all three before your final message:
+
+1. **Cites.** Every factual claim in `testing.md`, `security.md`, and `performance.md` carries a `cite:` token — own-line `cite: <relpath>#Lstart-Lend symbol: <name>` in prose, or a `cite: "<relpath>#Lstart-Lend"` field as the last key inside a fenced YAML record. NEVER the inline shorthand `path:line` (e.g. `utils.py:1087`): it lacks the `cite:` prefix and `#L`, so the verifier and consuming agents cannot see it. Every auth mechanism, validation point, and bottleneck you name should carry a cite.
+2. **Frontmatter.** Every file you write has `type`, `id`, `title`, and `description`.
+3. **Manifest — returned, never written.** Return the `manifest:` block (§7) as your FINAL chat message — top key literally `manifest:`, `phases: [7, 9]`, `files_written` a list of `{path, covers}` with OUTPUT_PATH-relative paths. Do NOT create a `manifest.md` / `manifest-quality-auditor.md` or any manifest file in the output folder — that pollutes the KB. The only files you write are `testing.md`, `security.md`, `performance.md`. Do NOT return a prose summary in the manifest's place.

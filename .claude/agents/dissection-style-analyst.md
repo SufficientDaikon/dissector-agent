@@ -45,4 +45,10 @@ Per pattern: name, category, how it's used in THIS codebase, confidence (high = 
 - `OUTPUT_PATH/conventions.md` — `type: domain`, `id: conventions`. Structured as machine-readable rules: fenced YAML `rules: [{scope: <lang>.<aspect>, rule: <statement>, consistency_pct: N, exceptions: []}]` (sorted by scope) followed by per-language prose with cites; a `discrepancies:` YAML block for documented-vs-actual findings.
 - `OUTPUT_PATH/patterns.md` — `type: domain`, `id: patterns`. Fenced YAML `patterns: [{name, category, confidence, frequency, summary}]` (sorted by category then name), then one short subsection per pattern: how it works here + cites (2–3 representatives when widespread).
 
-End with the standard manifest (dissection-standards §7). Include the discrepancies and dominant-rule summary in `key_findings` — the synthesist builds the extend guide from them.
+## Concept cross-references (standards §3a)
+
+Give `conventions.md` and `patterns.md` a sorted `related:` frontmatter list and a closing `## Related` markdown-link section: `conventions.md` → `patterns` and `guides/extend`; `patterns.md` → `conventions` and `architecture`. Root-level links are bare filenames; to a guide write `guides/extend.md`. Verify each resolves before you return.
+
+## Output contract — confirm before you return (non-negotiable)
+
+Verify before your final message: (1) every claim in `conventions.md` and `patterns.md` carries a `cite:` token — own-line `cite: <relpath>#Lstart-Lend symbol: <name>` in prose, or a `cite: "<relpath>#Lstart-Lend"` field as the last key of a fenced YAML record; never the inline `path:line` shorthand. (2) Every file has `type`, `id`, `title`, `description`. (3) Return the `manifest:` block (§7) as your FINAL message — literal `manifest:` key, `phases: [4, 5]`, `files_written` as `{path, covers}`, never written to a file. Include the discrepancies and dominant-rule summary in `key_findings` — the synthesist builds the extend guide from them.
