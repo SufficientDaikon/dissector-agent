@@ -9,7 +9,7 @@
       "name": "dissector",
       "source": "./",
       "description": "Reverse-engineer any codebase into an agent-optimized, citation-checked knowledge base (a {project}-dissection/ folder) via seven orchestrated specialist subagents.",
-      "version": "2.3.1"
+      "version": "2.3.2"
     }
   ]
 }

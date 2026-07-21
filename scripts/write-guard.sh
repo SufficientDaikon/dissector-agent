@@ -8,16 +8,26 @@
 #
 # Contract (Claude Code hooks):
 #   - Tool call JSON arrives on stdin; .tool_input.file_path is the target.
-#   - We ALLOW writes whose canonical path is inside a "*-dissection" folder by
-#     emitting an explicit PreToolUse permissionDecision of "allow". A bare
-#     `exit 0` is NOT sufficient under plugin load: the agents' acceptEdits
-#     permission mode is ignored for plugin hooks, and a no-output PreToolUse
-#     hook DEFERS to the session permission mode rather than approving — so
-#     every specialist KB write would otherwise prompt (interactive) or
-#     auto-deny (`claude -p`). The explicit "allow" is what unblocks the write.
-#   - Otherwise we emit a PreToolUse permissionDecision of "ask" so the human
-#     is prompted rather than silently blocked (the main-session user's own
-#     edits outside a dissection folder should not be hard-denied by a plugin).
+#   - ACTIVE-RUN GATE: plugin hooks load at user scope and fire on every
+#     Write|Edit in every session — but this guard is only meaningful WHILE a
+#     dissection is running. The /dissect orchestrator marks a live run with
+#     OUTPUT_PATH/.dissect-lock (created in Stage 0, removed in Stage 4, stale
+#     after 2h — same window Stage 0 uses). If no fresh lock exists under the
+#     session directory AND the write target is not itself inside a
+#     "*-dissection" folder, we emit NOTHING and exit 0: a silent PreToolUse
+#     hook defers to the user's own permission settings, so ordinary editing
+#     everywhere else is never prompted by this plugin.
+#   - When a run IS active: we ALLOW writes whose canonical path is inside a
+#     "*-dissection" folder by emitting an explicit PreToolUse
+#     permissionDecision of "allow". A bare `exit 0` is NOT sufficient under
+#     plugin load: the agents' acceptEdits permission mode is ignored for
+#     plugin hooks, and a no-output PreToolUse hook DEFERS to the session
+#     permission mode rather than approving — so every specialist KB write
+#     would otherwise prompt (interactive) or auto-deny (`claude -p`). The
+#     explicit "allow" is what unblocks the write.
+#   - Any other mid-run write gets a permissionDecision of "ask" so the human
+#     is prompted rather than silently blocked — this is the prompt-injection
+#     backstop, scoped to the only window where it matters.
 #   - Defensive: if jq is missing or input is unparseable, exit 0 (pass-through)
 #     so we never break the user's session.
 
@@ -47,11 +57,52 @@ if [ -z "$file_path" ]; then
   exit 0
 fi
 
+# ---- Active-run gate -------------------------------------------------------
+# Only guard while a dissection is actually in progress. Signal: a fresh
+# .dissect-lock directly inside a "*-dissection" child of the session
+# directory (the orchestrator always creates OUTPUT_FOLDER in the session
+# CWD, so depth 2 is exact). Session dir: the hook input's .cwd, falling back
+# to $CLAUDE_PROJECT_DIR, then $PWD.
+session_dir="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
+if [ -z "$session_dir" ] || [ ! -d "$session_dir" ]; then
+  session_dir="${CLAUDE_PROJECT_DIR:-$PWD}"
+fi
+
+run_active=""
+if [ -d "$session_dir" ]; then
+  lock_hit="$(find "$session_dir" -maxdepth 2 -path '*-dissection/.dissect-lock' -mmin -120 2>/dev/null | head -n 1)"
+  [ -n "$lock_hit" ] && run_active="yes"
+fi
+
+# A write targeting a "*-dissection" path is in-scope even without a lock hit
+# (a subagent's cwd can differ from where the output folder lives). Normalize
+# backslashes first so Windows-style paths match. This only decides whether to
+# RUN the decision logic below — the allow/ask verdict still comes from the
+# canonicalized path, so a traversal like "x-dissection/../../etc" ends in
+# "ask", never "allow".
+case "$(printf '%s' "$file_path" | tr '\\' '/')" in
+  *-dissection/*) run_active="yes" ;;
+esac
+
+# No active run, target unrelated to any dissection folder -> stay silent so
+# the user's own permission flow decides. The hook must never nag outside runs.
+if [ -z "$run_active" ]; then
+  exit 0
+fi
+# ---------------------------------------------------------------------------
+
 # Canonicalize. The target may not exist yet (a new file), so canonicalize the
 # parent directory and re-append the basename. If NO canonicalization tool is
 # available, leave $canon empty: we must NEVER make the security decision from a
 # raw, un-normalized path (a raw "<x>-dissection/../../etc/passwd" would slip
 # through the "*-dissection/*" glob). An empty $canon forces the "ask" branch.
+# Normalize backslashes to forward slashes first: on Windows the harness may
+# hand us "C:\Users\...\x-dissection\y.md", which dirname/realpath would treat
+# as one opaque component and the "-dissection/" glob would never match — the
+# specialists' own KB writes would then land in "ask" instead of "allow".
+# (Literal backslashes in POSIX filenames are legal but vanishingly rare, and
+# mis-normalizing one only ever degrades toward "ask", never toward "allow".)
+file_path="$(printf '%s' "$file_path" | tr '\\' '/')"
 canon=""
 dir="$(dirname "$file_path")"
 base="$(basename "$file_path")"
