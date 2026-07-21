@@ -63,7 +63,7 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
      ```yaml
      schema_version: "1.0"
      spec: {okf: "0.1"}
-     generator: {name: dissector, version: 2.3.1}
+     generator: {name: dissector, version: 2.3.2}
      generated_from:
        path: <CODEBASE_PATH>
      status: {complete: false, phases_completed: 0}
@@ -130,7 +130,7 @@ Print `[Phase 13/13] Output — manifest, verification, summary...`
 ```yaml
 schema_version: "1.0"
 spec: {okf: "0.1"}                    # Open Knowledge Format v0.1-compatible bundle (superset: adds cite: source tokens + this manifest)
-generator: {name: dissector, version: 2.3.1}
+generator: {name: dissector, version: 2.3.2}
 generated_from:
   path: <CODEBASE_PATH>
   commit: <git -C CODEBASE_PATH rev-parse HEAD, or null>
