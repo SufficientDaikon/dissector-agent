@@ -137,14 +137,17 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
 ├── api/<module-id>.md      # public API per module: signatures + citations
 └── guides/
     ├── extend.md           # recipes: add a feature/endpoint/test, conventions to follow
-    └── rebuild.md          # reconstruction map: build order, extension points, fork strategy
+    ├── rebuild.md          # reconstruction map: build order, extension points, fork strategy
+    └── maintain.md         # how an agent keeps this KB in sync as the code changes
 ```
+
+By default the folder is created **inside the dissected repo** (`<repo>/{project}-dissection/`), so the map lives with the code it maps. In a git repo it's added to `.git/info/exclude`, so it never shows in `git status` or gets committed by accident. If the repo isn't writable, Dissector falls back to your current directory and tells you.
 
 `<module-id>` is the module's source path with each `/` replaced by a double hyphen `--` (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths — a single `/` never maps to a single `-`, so `src/foo-bar` and `src/foo/bar` never merge.
 
 Every KB file carries queryable YAML frontmatter (`type`, `id`, `title`, `description`, plus type-specific keys like `public_exports`, `covers`, `depends_on`) and a sorted `related:` list of sibling concepts, and closes with a `## Related` section of markdown links to those siblings — the edges that make the KB a navigable graph.
 
-**How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), then hop between concepts via each file's `## Related` links — the KB is a navigable graph, not just a hub; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files. To make agents use the KB automatically, add a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` (e.g. `> See {project}-dissection/index.md for the codebase map`) — Dissector prints the exact snippet at the end of a run and never writes into your source tree itself.
+**How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), then hop between concepts via each file's `## Related` links — the KB is a navigable graph, not just a hub; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files — the KB's own `guides/maintain.md` spells out this staleness check and the safe update procedure for an agent. At the end of a run Dissector **offers** to wire the KB in for you (with your confirmation): it appends a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` so agents auto-discover the map. Decline and it just prints the snippet to paste yourself — that consented pointer is the only thing Dissector ever writes outside the dissection folder.
 
 **Open Knowledge Format compatible.** A dissection is a valid [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset): one Markdown-with-frontmatter file per concept, path-as-identity, an `index.md` hub, and concepts linked into a graph via `## Related` — so any OKF-aware tool can ingest a dissection folder. Dissector layers on two things OKF leaves out: `cite:` tokens pinning every claim to `path#Lstart-Lend` in the source, and a machine `manifest.yaml` (compatibility declared via `spec: {okf: "0.1"}`) for coverage and staleness.
 
@@ -173,9 +176,9 @@ Dissector runs entirely through **your configured Claude Code backend** — the 
 
 ## Where should the KB live? (governance)
 
-The dissection is a concentrated, greppable map of your system — it aggregates endpoints, environment-variable names, config surface, and verbatim code snippets in one place. Treat it with the same care as the code it describes:
+The dissection is a concentrated, greppable map of your system — it aggregates endpoints, environment-variable names, config surface, and verbatim code snippets in one place. It's created inside the repo but **git-excluded by default** (via `.git/info/exclude`), so it never enters version control unless you choose to. Treat it with the same care as the code it describes:
 
-- **Commit it** when you want the whole team (and their agents) to share one maintained map — it diffs cleanly and is cheap to regenerate. Good for internal repos.
+- **Commit it** when you want the whole team (and their agents) to share one maintained map — remove the `.git/info/exclude` entry to start tracking it. It diffs cleanly and is cheap to regenerate. Good for internal repos.
 - **Gitignore it** (or store it in an access-controlled location) when the repo is sensitive and you don't want a consolidated attack-surface map in version control. The KB can make reconnaissance easier for anyone who gets read access.
 
 > [!WARNING]
@@ -201,7 +204,7 @@ The dissection is a concentrated, greppable map of your system — it aggregates
 
 **A specialist failed mid-run — now what?** The run continues; the result is marked partial (`status.complete: false` in the manifest, a completion checklist in `index.md`) and the summary tells you which specialist to re-run. Re-running `/dissect` regenerates the whole dissection.
 
-**How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the staleness data in `manifest.yaml` to identify dirty files and ask Claude to re-run just the owning specialist.
+**How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the staleness data in `manifest.yaml` to identify dirty files and ask Claude to re-run just the owning specialist. Every KB ships a `guides/maintain.md` that walks an agent through exactly this — detecting stale docs via `covers`/`source_hashes` and updating them without breaking the citation/format contract.
 
 **How do I update the installed plugin when a new version ships?** Plugins don't self-update — your install stays on whatever version you first pulled until you act. In any Claude Code session run `/plugin` → **Installed** → **dissector** → **Update** (or `/plugin marketplace update SufficientDaikon/dissector-agent`, then reinstall). If a version ever misbehaves, `/plugin` → **Installed** → **dissector** → **Disable** turns it off without uninstalling.
 

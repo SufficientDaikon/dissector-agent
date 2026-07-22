@@ -51,7 +51,7 @@ The root of the KB, <200 lines, llms.txt-style. Structure:
 1. H1 `{PROJECT_NAME} — dissection` + blockquote: what the project is (one paragraph, inferred) and what this KB is.
 2. **Reading order for agents**: one line — "load this file, then hop between concepts via each file's `## Related` links (the KB is a graph, not just this hub); grep `cite:` tokens to jump to source; see manifest.yaml for coverage and staleness data."
 3. **Quick facts** (fenced YAML): primary language, module count, entry points, sampling tier, counts.
-4. H2 sections mirroring the KB layout — Structure / Interfaces / Practices / Guides — each a bullet list of `[title](relative-path) — one-line description` for EVERY KB file, including every `modules/*` and `api/*` file.
+4. H2 sections mirroring the KB layout — Structure / Interfaces / Practices / Guides — each a bullet list of `[title](relative-path) — one-line description` for EVERY KB file, including every `modules/*` and `api/*` file. The Guides section MUST list `guides/maintain.md` (the maintenance guide the orchestrator writes at run start — describe it as "how to keep this dissection in sync with the code") alongside `guides/extend.md` and `guides/rebuild.md`.
 5. If any manifest reported `status: partial`: an H2 `Completion status` section with a checklist of complete/missing files and the line `This dissection is PARTIAL — re-run /dissect to complete.`
 6. If the Recon Brief noted manifest conflicts or Tier 2/3 sampling: one-line notes stating name-resolution choice and sampling methodology (what was exhaustive, what was sampled, what was skipped).
 
@@ -61,7 +61,7 @@ A short `AGENTS.md` **inside OUTPUT_PATH** (never write into the analyzed repo) 
 
 1. H1 `{PROJECT_NAME} — dissected codebase map`.
 2. One paragraph: this folder is an agent-optimized knowledge base reverse-engineered from the codebase; start at `index.md`.
-3. A short bullet list of the highest-value files with one-line descriptions (`index.md`, `architecture.md`, `symbol-map.md`, `guides/extend.md`, `manifest.yaml`) — relative paths.
+3. A short bullet list of the highest-value files with one-line descriptions (`index.md`, `architecture.md`, `symbol-map.md`, `guides/extend.md`, `guides/maintain.md`, `manifest.yaml`) — relative paths.
 4. One line: "Every factual claim carries a `cite:` token pointing to `path#Lstart-Lend` in the source; grep them to jump to code."
 5. One line telling a human they can copy this file to their repo root or reference `{OUTPUT_FOLDER}/index.md` from their existing CLAUDE.md/AGENTS.md.
 
