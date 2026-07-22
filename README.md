@@ -1,3 +1,5 @@
+<div align="center">
+
 # 🔬 Dissector
 
 **A Claude Code multi-agent system that reverse-engineers any codebase into an agent-optimized knowledge base.**
@@ -5,6 +7,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Multi--Agent_System-orange.svg)](https://code.claude.com/docs)
 [![OKF v0.1 compatible](https://img.shields.io/badge/OKF-v0.1_compatible-green.svg)](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
+[![Static analysis only](https://img.shields.io/badge/analysis-static_only-blue.svg)](#security)
+[![7 specialist agents](https://img.shields.io/badge/agents-7_specialists-8b5cf6.svg)](#how-it-works)
+
+**[Installation](#installation)** · **[Usage](#usage)** · **[Output format](#output-format)** · **[Security](#security)** · **[FAQ](#faq)**
+
+</div>
 
 Point it at a repository and it produces a `{project}-dissection/` folder — a complete, machine-parseable map of the codebase (architecture, modules, APIs, conventions, patterns, tests, build system, dependencies) that another AI agent can load to understand the project without re-scanning it, extend it safely, rebuild it from scratch, or keep it maintained as the code evolves.
 
@@ -26,24 +34,21 @@ Traditional generated docs are written for humans. Dissector's output is written
 
 Dissector is not one agent — it's an orchestrated system of seven. A monolithic prompt analyzing a whole codebase in one context window runs out of room; Dissector gives each analysis domain a fresh context window and runs the middle of the pipeline in parallel:
 
-```
-/dissect <path>          (or: claude --agent dissector)
-        │
-        ▼
-ORCHESTRATOR — validates input, resolves project name, coordinates; holds
-        │      only briefs and manifests, never raw source
-        │
-        ├─ Stage 1  dissection-scout             discovery + structure  →  Recon Brief
-        │
-        ├─ Stage 2  (four specialists IN PARALLEL, disjoint output files)
-        │     ├─ dissection-stack-auditor         tech stack, dependencies, build/CI
-        │     ├─ dissection-style-analyst         conventions, design patterns
-        │     ├─ dissection-interface-documenter  APIs, symbol map, error handling
-        │     └─ dissection-quality-auditor       testing, security, performance
-        │
-        ├─ Stage 3  dissection-synthesist         guides, glossary, root index
-        │
-        └─ Stage 4  manifest.yaml, link verification, completion summary
+```mermaid
+flowchart TD
+    U["/dissect PATH<br/>(or: claude --agent dissector)"] --> O["Orchestrator<br/>validates input · resolves project name · coordinates<br/>holds only briefs and manifests, never raw source"]
+    O --> S1["Stage 1 · dissection-scout<br/>discovery + structure"]
+    S1 -. Recon Brief .-> G
+    subgraph G["Stage 2 · four specialists in parallel · disjoint output files"]
+        direction LR
+        SA["stack-auditor<br/>tech stack · deps · build/CI"]
+        ST["style-analyst<br/>conventions · patterns"]
+        IN["interface-documenter<br/>APIs · symbol map · errors"]
+        QA["quality-auditor<br/>testing · security · performance"]
+    end
+    G --> S3["Stage 3 · dissection-synthesist<br/>guides · glossary · root index"]
+    S3 --> S4["Stage 4 · finalize<br/>manifest.yaml · cite verification · summary"]
+    S4 --> KB[("{project}-dissection/")]
 ```
 
 Each specialist writes its knowledge-base files directly and returns only a compact manifest, so the orchestrator's context stays small no matter how big the target codebase is. The classic 13-phase Dissector methodology (discovery → structure → tech stack → conventions → patterns → APIs → testing → error handling → security & performance → dependencies → build system → synthesis → output) is preserved — redistributed across the specialists.
@@ -71,9 +76,13 @@ Each specialist writes its knowledge-base files directly and returns only a comp
 
 This installs the seven agents, both skills, the `/dissect` command, and the `PreToolUse` write-guard hook (see [Security](#security)) as a semver-tagged bundle you can update in place. For a team, check the plugin into the repo's project settings so every collaborator gets it automatically.
 
+> [!TIP]
+> Plugins don't auto-update. When a new version ships, pull it with `/plugin` → **Installed** → **dissector** → **Update** (details in the [FAQ](#faq)).
+
 **Zero-install (project-local):** clone this repo and start Claude Code inside it — the `.claude/` directory is picked up automatically and `/dissect` is available in that session. No plugin install needed.
 
-**User-level script install (fallback for offline / no-plugin setups):**
+<details>
+<summary><strong>User-level script install</strong> — fallback for offline / no-plugin setups</summary>
 
 macOS/Linux:
 ```bash
@@ -86,6 +95,8 @@ Windows (PowerShell):
 ```
 
 This copies the agents, skills, and command into `~/.claude/`. Prerequisite: the [Claude Code CLI](https://code.claude.com/docs).
+
+</details>
 
 ## Usage
 
@@ -155,6 +166,9 @@ Sampling adapts automatically to codebase size: under 500 source files every fil
 
 ## Data flow
 
+> [!NOTE]
+> There is no Dissector server, telemetry, or third-party call — everything runs through **your** configured Claude Code backend, and the generated KB stays on local disk.
+
 Dissector runs entirely through **your configured Claude Code backend** — the Anthropic API, Amazon Bedrock, or Google Vertex AI, whichever your Claude Code is set to. Source files are read locally and sent to that model backend for analysis exactly as any Claude Code session would; **nothing else leaves your machine**, there is no Dissector server, telemetry, or third-party call. The generated knowledge base is written to a local `{project}-dissection/` folder and stays on disk — it is never uploaded anywhere by the tool. If your organization requires Bedrock/Vertex or zero-retention routing, configure Claude Code accordingly and Dissector inherits it.
 
 ## Where should the KB live? (governance)
@@ -164,7 +178,8 @@ The dissection is a concentrated, greppable map of your system — it aggregates
 - **Commit it** when you want the whole team (and their agents) to share one maintained map — it diffs cleanly and is cheap to regenerate. Good for internal repos.
 - **Gitignore it** (or store it in an access-controlled location) when the repo is sensitive and you don't want a consolidated attack-surface map in version control. The KB can make reconnaissance easier for anyone who gets read access.
 
-Secrets are redacted (`[REDACTED]`) with a deterministic output-side backstop scan, but redaction is best-effort — do not treat the KB as safe to publish just because it was scanned. Decide commit-vs-ignore deliberately per repo.
+> [!WARNING]
+> A dissection concentrates endpoints, env-var names, config surface, and verbatim code snippets into one greppable place. Secrets are redacted best-effort (`[REDACTED]` plus a deterministic Stage-4 backstop scan), but **don't treat the KB as safe to publish just because it was scanned** — decide commit-vs-gitignore deliberately per repo.
 
 ## Security
 
