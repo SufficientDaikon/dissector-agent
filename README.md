@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Multi--Agent_System-orange.svg)](https://code.claude.com/docs)
+[![OKF v0.1 compatible](https://img.shields.io/badge/OKF-v0.1_compatible-green.svg)](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
 
 Point it at a repository and it produces a `{project}-dissection/` folder — a complete, machine-parseable map of the codebase (architecture, modules, APIs, conventions, patterns, tests, build system, dependencies) that another AI agent can load to understand the project without re-scanning it, extend it safely, rebuild it from scratch, or keep it maintained as the code evolves.
 
@@ -15,9 +16,11 @@ Traditional generated docs are written for humans. Dissector's output is written
 
 - **Markdown + YAML frontmatter** — the format every agent runtime already navigates (the same convention as `llms.txt`, `AGENTS.md`, `CLAUDE.md`, `SKILL.md`), substantially cheaper in tokens than JSON or XML, and line-oriented so it survives chunked reads, greps cleanly, and git-diffs minimally.
 - **Progressive disclosure** — a small `index.md` root (always cheap to load) links to focused per-domain and per-module files, each 200–600 lines. Agents load only what they need.
+- **Navigable concept graph** — every KB file carries a `related:` frontmatter list and a `## Related` link section, so an agent hops concept→concept (a module → its API → the symbol map → architecture), not only through the `index.md` hub.
 - **Greppable citations** — every factual claim carries an own-line token like `cite: src/parser/index.ts#L18-L31 symbol: parse`, so `rg 'src/parser/'` over the KB finds every claim about a file.
 - **Deterministic and diffable** — sorted lists, stable path-derived IDs, volatile metadata confined to `manifest.yaml`. Regenerating from unchanged sources produces near-identical bytes.
 - **Staleness-aware** — `manifest.yaml` records which source globs each KB file covers plus content hashes, so after a code change you can compute exactly which KB files are dirty and regenerate only those.
+- **OKF-compatible** — a dissection is a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset), so any OKF-aware tool can ingest it.
 
 ## How it works
 
@@ -59,7 +62,7 @@ Each specialist writes its knowledge-base files directly and returns only a comp
 
 ## Installation
 
-**Preferred — Claude Code plugin (versioned, auto-updating, ships the write-guard hook):** from any Claude Code session,
+**Preferred — Claude Code plugin (versioned, updatable in place, ships the write-guard hook):** from any Claude Code session,
 
 ```
 /plugin marketplace add SufficientDaikon/dissector-agent
@@ -128,6 +131,8 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
 
 `<module-id>` is the module's source path with each `/` replaced by a double hyphen `--` (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths — a single `/` never maps to a single `-`, so `src/foo-bar` and `src/foo/bar` never merge.
 
+Every KB file carries queryable YAML frontmatter (`type`, `id`, `title`, `description`, plus type-specific keys like `public_exports`, `covers`, `depends_on`) and a sorted `related:` list of sibling concepts, and closes with a `## Related` section of markdown links to those siblings — the edges that make the KB a navigable graph.
+
 **How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), then hop between concepts via each file's `## Related` links — the KB is a navigable graph, not just a hub; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files. To make agents use the KB automatically, add a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` (e.g. `> See {project}-dissection/index.md for the codebase map`) — Dissector prints the exact snippet at the end of a run and never writes into your source tree itself.
 
 **Open Knowledge Format compatible.** A dissection is a valid [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset): one Markdown-with-frontmatter file per concept, path-as-identity, an `index.md` hub, and concepts linked into a graph via `## Related` — so any OKF-aware tool can ingest a dissection folder. Dissector layers on two things OKF leaves out: `cite:` tokens pinning every claim to `path#Lstart-Lend` in the source, and a machine `manifest.yaml` (compatibility declared via `spec: {okf: "0.1"}`) for coverage and staleness.
@@ -182,6 +187,8 @@ Secrets are redacted (`[REDACTED]`) with a deterministic output-side backstop sc
 **A specialist failed mid-run — now what?** The run continues; the result is marked partial (`status.complete: false` in the manifest, a completion checklist in `index.md`) and the summary tells you which specialist to re-run. Re-running `/dissect` regenerates the whole dissection.
 
 **How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the staleness data in `manifest.yaml` to identify dirty files and ask Claude to re-run just the owning specialist.
+
+**How do I update the installed plugin when a new version ships?** Plugins don't self-update — your install stays on whatever version you first pulled until you act. In any Claude Code session run `/plugin` → **Installed** → **dissector** → **Update** (or `/plugin marketplace update SufficientDaikon/dissector-agent`, then reinstall). If a version ever misbehaves, `/plugin` → **Installed** → **dissector** → **Disable** turns it off without uninstalling.
 
 ## License
 
