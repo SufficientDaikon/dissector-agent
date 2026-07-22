@@ -48,14 +48,16 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
    ```
    and wait for the user's decision before continuing.
 5. **Git commit sample** (Bash): if `CODEBASE_PATH` is a git work tree (`git -C "$CODEBASE_PATH" rev-parse --is-inside-work-tree` succeeds), capture `git -C "$CODEBASE_PATH" log --oneline -20` subjects into `GIT_COMMIT_SAMPLE` (a short newline-joined list). The synthesist has no Bash, so it cannot sample git itself — you pass this in. If not a git tree, `GIT_COMMIT_SAMPLE` is empty.
-6. **Idempotency & safe overwrite**: `OUTPUT_FOLDER = "{PROJECT_NAME}-dissection"` in the CWD; `OUTPUT_PATH` = its absolute path (`"$PWD/$OUTPUT_FOLDER"`).
+6. **Resolve the output location — inside the dissected repo by default**: `OUTPUT_FOLDER = "{PROJECT_NAME}-dissection"`. The KB lives **with the code it maps**, so the default parent is `CODEBASE_PATH`, not the CWD: `OUTPUT_BASE = "$CODEBASE_PATH"`, `OUTPUT_PATH = "$CODEBASE_PATH/$OUTPUT_FOLDER"`. **Writability fallback**: if `CODEBASE_PATH` is not writable (`[ ! -w "$CODEBASE_PATH" ]` — e.g. a read-only mount or a repo you don't own), set `OUTPUT_BASE = "$PWD"`, `OUTPUT_PATH = "$PWD/$OUTPUT_FOLDER"` instead, and print: `ℹ️ {CODEBASE_PATH} is not writable — writing the dissection to the current directory ({PWD}/{OUTPUT_FOLDER}) instead of inside the repo.` Use `OUTPUT_BASE` (the parent actually chosen) in the checks below.
+
+   **Idempotency & safe overwrite:**
    - **Folder does not exist** → proceed to step 7.
-   - **Folder exists WITHOUT `manifest.yaml`** → print `❌ Error: A folder named "{OUTPUT_FOLDER}" already exists but is not a previous dissection (no manifest.yaml marker). Cannot overwrite.` and `💡 Suggestion: Rename the existing folder or run from a different working directory.` → HALT.
+   - **Folder exists WITHOUT `manifest.yaml`** → print `❌ Error: A folder named "{OUTPUT_FOLDER}" already exists at {OUTPUT_BASE} but is not a previous dissection (no manifest.yaml marker). Cannot overwrite.` and `💡 Suggestion: Rename or remove the existing folder, then re-run.` → HALT.
    - **Folder exists WITH `manifest.yaml`** → run the checks below IN ORDER, before any deletion; ALL must pass. The concurrency-lock check comes FIRST, because the overwrite gate ends by deleting the folder (and the `.dissect-lock` inside it) — inspect the lock while it still exists.
      1. **Concurrency lock**: if `OUTPUT_PATH/.dissect-lock` exists and its timestamp is younger than 2 hours (`find "$OUTPUT_PATH/.dissect-lock" -mmin -120` non-empty, or compare the stored epoch to `date +%s`), another dissection is in progress — refuse: `❌ Error: Another dissection of "{PROJECT_NAME}" appears to be running (lock at {OUTPUT_PATH}/.dissect-lock, < 2h old). Wait for it to finish or delete the lock if it is stale.` → HALT.
      2. **Generator marker**: parse `OUTPUT_PATH/manifest.yaml` and require `generator.name: dissector`. If absent/different → refuse: `❌ Error: "{OUTPUT_FOLDER}" contains a manifest.yaml not written by Dissector (generator.name is not "dissector"). Refusing to delete it.` → HALT. (A stub manifest written in step 7 of a prior interrupted run also carries `generator.name: dissector` with `status.complete: false` — that IS a resumable/overwritable previous dissection, so it passes this gate.)
      3. **Provenance match**: read `generated_from.path` from that manifest. If it is present and does NOT resolve to the same path as `CODEBASE_PATH`, refuse: `❌ Error: "{OUTPUT_FOLDER}" is a dissection of a DIFFERENT codebase ({other_path}), not {CODEBASE_PATH}. Refusing to overwrite it — rename it or run elsewhere.` → HALT. (A stub with no `generated_from.path` yet is allowed.)
-     4. **Realpath assertion**: resolve BOTH sides before comparing — assert `realpath "$OUTPUT_PATH"` equals `"$(realpath "$PWD")/$OUTPUT_FOLDER"` (i.e. `dirname` of the resolved output equals the resolved current directory and the leaf name is exactly `OUTPUT_FOLDER`). Resolving both sides keeps a symlinked *ancestor* of `$PWD` (macOS `/tmp`→`/private/tmp`, a symlinked `$HOME`) from false-refusing a legit re-run. If it still resolves outside the current directory, refuse: `❌ Error: "{OUTPUT_FOLDER}" does not resolve to a folder directly inside the current directory. Refusing to delete {resolved}.` → HALT.
+     4. **Realpath assertion**: resolve BOTH sides before comparing — assert `realpath "$OUTPUT_PATH"` equals `"$(realpath "$OUTPUT_BASE")/$OUTPUT_FOLDER"` (i.e. `dirname` of the resolved output equals the resolved chosen base — the repo root, or the CWD if the writability fallback fired — and the leaf name is exactly `OUTPUT_FOLDER`). Resolving both sides keeps a symlinked *ancestor* (macOS `/tmp`→`/private/tmp`, a symlinked `$HOME`) from false-refusing a legit re-run. If it resolves outside `OUTPUT_BASE`, refuse: `❌ Error: "{OUTPUT_FOLDER}" does not resolve to a folder directly inside {OUTPUT_BASE}. Refusing to delete {resolved}.` → HALT.
    - Only when all four pass: print `⚠️ Previous dissection found at "{OUTPUT_PATH}". Overwriting...`, then `rm -rf "$OUTPUT_PATH"` and proceed.
 7. **Create folder, stub manifest, and lock**:
    - `mkdir -p "$OUTPUT_PATH/modules" "$OUTPUT_PATH/api" "$OUTPUT_PATH/guides"` so parallel specialists never race on directories.
@@ -63,13 +65,83 @@ If the Agent tool is unavailable in your session (you were spawned as a subagent
      ```yaml
      schema_version: "1.0"
      spec: {okf: "0.1"}
-     generator: {name: dissector, version: 2.3.2}
+     generator: {name: dissector, version: 2.4.0}
      generated_from:
        path: <CODEBASE_PATH>
      status: {complete: false, phases_completed: 0}
      ```
    - Write the lock: `date +%s > "$OUTPUT_PATH/.dissect-lock"`.
-8. **Output self-exclusion in a git work tree**: if `CODEBASE_PATH` is a git work tree AND `OUTPUT_PATH` is inside it (the user ran `/dissect .` and the CWD is the repo), append the output folder to `.git/info/exclude` so the generated KB never pollutes `git status`: `printf '%s\n' "$OUTPUT_FOLDER/" >> "$CODEBASE_PATH/.git/info/exclude"` (only if not already present). This is local-only and reversible; never edit the tracked `.gitignore`.
+   - Write the **standard maintenance guide** to `OUTPUT_PATH/guides/maintain.md` VERBATIM from this fixed template. It is generic and deterministic — the same bytes every run, no project-specific or volatile data — so it is written here (not by a specialist) to guarantee correctness. It tells any agent how to keep the KB in sync with the code; the synthesist links it from `index.md` and `AGENTS.md`. **Write it dedented — the leading whitespace below is only SKILL.md list formatting; the file's first line must be `---` at column 0.**
+     ````markdown
+     ---
+     type: guide
+     id: guides/maintain
+     title: Maintaining this dissection
+     description: How an agent detects which knowledge-base files are stale after code changes and updates them without breaking the format contract.
+     related: [guides/extend, index]
+     ---
+
+     # Maintaining this dissection
+
+     This folder is an agent-optimized knowledge base generated by Dissector from the codebase in its parent directory. Keep it in sync as the code changes, and read this before editing any KB file.
+
+     ## Invariants you must preserve when editing any KB file
+
+     - **Frontmatter**: keep `type`, `id`, `title`, `description` plus any type-specific keys (`source_roots`, `covers`, `public_exports`, `depends_on`, `related`).
+     - **Citations**: every claim about code carries a `cite:` token — own-line `cite: path#Lstart-Lend symbol: name`, or a `cite: "path#Lstart-Lend"` field as the last key of a fenced YAML record. Paths are relative to the analyzed repo root; line numbers are real and 1-based. Never use the inline `path:line` shorthand.
+     - **Concept graph**: keep each file's `related:` frontmatter and its closing `## Related` link section; every link must resolve.
+     - **Determinism**: keep all lists sorted lexicographically and section order fixed; put no timestamps, dates, or commit hashes in file bodies — volatile data lives only in `manifest.yaml`.
+     - **Secrets**: any redacted value stays `[REDACTED]`; never reintroduce a real secret.
+
+     ## Detect which files are stale
+
+     `../manifest.yaml` maps every KB file to the source it was derived from:
+
+     ```yaml
+     entries:
+       - id: modules/src--parser
+         covers: ["src/parser/**"]
+         source_hashes: {src/parser/index.ts: aabbccdd}
+     ```
+
+     A KB doc is stale when a source file matching its `covers` globs has changed since generation. Two ways to check, from the analyzed repo root:
+
+     - **By commit** (fast): `git diff --name-only <manifest generated_from.commit>..HEAD`, then match each changed path against every entry's `covers` globs — the matching docs are stale.
+     - **By hash** (no git needed): recompute the first 8 hex of `sha256` for each file under an entry's `covers` and compare to that entry's `source_hashes`; any mismatch, new, or removed file means the doc is stale.
+
+     ## Update the stale files — two paths
+
+     1. **Regenerate (preferred).** Re-run `/dissect <repo>`; it is deterministic, so unchanged docs stay byte-identical and only real changes move. If you are the Dissector orchestrator, re-run only the specialist that owns each stale file (table below) — this refreshes `manifest.yaml` automatically and cannot break the format contract.
+     2. **Surgical manual edit** (when you cannot run Dissector). Edit the stale file directly:
+        - Update the changed facts; keep prose terse and declarative.
+        - Re-anchor every affected `cite:` — open the current source and fix `#Lstart-Lend` to the real current range; confirm the named `symbol:` still appears in it.
+        - Preserve frontmatter, `related:`, `## Related`, and lexical sorting.
+        - In `../manifest.yaml`, update that entry's `source_hashes` (first 8 hex of `sha256` per covered file) and set `generated_from.date` (and `commit` if you refreshed against a new commit).
+        - Re-check each touched cite: the file exists, the range is within bounds, and the symbol is inside it.
+
+     ## Which specialist owns which file
+
+     | File(s) | Owning specialist |
+     |---|---|
+     | `architecture.md`, `modules/*.md` | dissection-scout |
+     | `tech-stack.md`, `dependencies.md`, `build-and-test.md` | dissection-stack-auditor |
+     | `conventions.md`, `patterns.md` | dissection-style-analyst |
+     | `api/*.md`, `symbol-map.md`, `errors.md` | dissection-interface-documenter |
+     | `testing.md`, `security.md`, `performance.md` | dissection-quality-auditor |
+     | `index.md`, `glossary.md`, `guides/*.md` | dissection-synthesist |
+
+     ## Guardrails
+
+     - Static analysis only: describe what the code IS; never execute, compile, or run it to establish a fact.
+     - Keep secrets redacted.
+     - When unsure whether a manual edit preserves the contract, prefer a full `/dissect` re-run.
+
+     ## Related
+
+     - [Extend guide](extend.md) — how to add features to the analyzed codebase.
+     - [Index](../index.md) — the root map of this knowledge base.
+     ````
+8. **Output self-exclusion in a git work tree**: the KB now lives inside the repo by default, so keep it out of `git status`. If `OUTPUT_PATH` is inside `CODEBASE_PATH` (i.e. the writability fallback did NOT fire) AND `CODEBASE_PATH` is a git work tree, append the output folder to `.git/info/exclude`: `printf '%s\n' "$OUTPUT_FOLDER/" >> "$CODEBASE_PATH/.git/info/exclude"` (only if not already present). This is local-only and reversible — to commit the KB deliberately (see the governance note in the README), remove that line. Never edit the tracked `.gitignore`. If the CWD fallback fired (output is outside the repo), skip this step.
 
 ## Stage 1 — Scout
 
@@ -130,7 +202,7 @@ Print `[Phase 13/13] Output — manifest, verification, summary...`
 ```yaml
 schema_version: "1.0"
 spec: {okf: "0.1"}                    # Open Knowledge Format v0.1-compatible bundle (superset: adds cite: source tokens + this manifest)
-generator: {name: dissector, version: 2.3.2}
+generator: {name: dissector, version: 2.4.0}
 generated_from:
   path: <CODEBASE_PATH>
   commit: <git -C CODEBASE_PATH rev-parse HEAD, or null>
@@ -182,12 +254,24 @@ entries:                             # sorted by id; one per KB file from files_
 ⏱️ Phases completed: {N}/13
 🤖 Agents: point any agent at {OUTPUT_PATH}/index.md to load the codebase map.
 ```
-   Then tell the user how to wire the KB into their tools: the synthesist wrote `{OUTPUT_PATH}/AGENTS.md` as a cross-tool entry point. Offer the exact one-line snippet they can add to their repo's `CLAUDE.md` / `AGENTS.md` (do NOT write into the analyzed repo yourself):
+8. **Offer to wire the KB into the repo** (the one intentional end-of-run prompt — the run is complete and the lock was already removed in step 6, so this is a post-run, consented write, outside the mid-run injection-defense window; the synthesist already wrote `{OUTPUT_PATH}/AGENTS.md` as a cross-tool entry point). Ask:
 ```
-💡 To make agents use this automatically, add one line to your repo's CLAUDE.md or AGENTS.md:
-   > See {OUTPUT_FOLDER}/index.md for the dissected codebase map (architecture, APIs, conventions).
-   Or copy {OUTPUT_FOLDER}/AGENTS.md into your repo root as a cross-tool entry point.
+💡 Want agents to auto-discover this map? Reply "yes" and I'll add a one-line pointer to your repo
+   (appended to CLAUDE.md if you have one, else AGENTS.md), or "copy" to drop the KB's AGENTS.md at
+   your repo root. Reply "no" to leave your repo untouched.
 ```
+   - **On "yes"** — target `CODEBASE_PATH/CLAUDE.md` if it exists, else `CODEBASE_PATH/AGENTS.md` (create if neither exists). Idempotent: `grep -qF` the pointer first and skip if already present; NEVER overwrite — append (with a leading blank line if the file is non-empty) this exact line:
+```
+> See {OUTPUT_FOLDER}/index.md for the dissected codebase map (architecture, APIs, conventions). To keep it in sync with the code, follow {OUTPUT_FOLDER}/guides/maintain.md.
+```
+     Then confirm what you wrote and where. (If the writability fallback put the KB outside the repo, use the absolute `{OUTPUT_PATH}` in the line instead of `{OUTPUT_FOLDER}`.)
+   - **On "copy"** — `cp "{OUTPUT_PATH}/AGENTS.md" "{CODEBASE_PATH}/AGENTS.md"` ONLY if the repo root has no `AGENTS.md`; if one exists, never clobber it — append the pointer line (as above) instead.
+   - **On "no" / no clear answer** — write nothing; print the snippet for the user to paste themselves:
+```
+💡 To wire it up later, add to your repo's CLAUDE.md or AGENTS.md:
+   > See {OUTPUT_FOLDER}/index.md for the dissected codebase map. Maintain it via {OUTPUT_FOLDER}/guides/maintain.md.
+```
+   This CLAUDE.md/AGENTS.md pointer is the ONLY thing Dissector ever writes outside the dissection folder, and only after explicit consent — never any other file, never without a "yes".
 
 ## Partial-run protocol
 

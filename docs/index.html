@@ -747,7 +747,7 @@ footer a { color: var(--accent); }
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <h2>🔬 Dissector</h2>
-    <p>v2.3.2 · Claude Code multi-agent system</p>
+    <p>v2.4.0 · Claude Code multi-agent system</p>
     <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
   </div>
   <nav>
@@ -1016,10 +1016,14 @@ chmod +x install.sh && ./install.sh
     <div class="file">│&nbsp;&nbsp; └── &lt;module-id&gt;.md <span class="comment"># public API: signatures + citations</span></div>
     <div class="dir">└── guides/</div>
     <div class="file">&nbsp;&nbsp;&nbsp; ├── extend.md <span class="comment"># recipes: add a feature/endpoint/test</span></div>
-    <div class="file">&nbsp;&nbsp;&nbsp; └── rebuild.md <span class="comment"># reconstruction map + fork strategy</span></div>
+    <div class="file">&nbsp;&nbsp;&nbsp; ├── rebuild.md <span class="comment"># reconstruction map + fork strategy</span></div>
+    <div class="file">&nbsp;&nbsp;&nbsp; └── maintain.md <span class="comment"># how an agent keeps the KB in sync as code changes</span></div>
   </div>
   <p>
-    <strong>How agents consume it:</strong> load <code>index.md</code>, then hop between concepts via each file's <code>## Related</code> links (the KB is a navigable graph); grep <code>cite:</code> tokens to jump into source; use <code>manifest.yaml</code> to detect staleness — intersect <code>git diff --name-only</code> with each entry's <code>covers</code> globs (or compare <code>source_hashes</code>) and regenerate only the dirty files.
+    The folder is created <strong>inside the dissected repo</strong> by default (<code>&lt;repo&gt;/{project}-dissection/</code>) so the map lives with the code it maps, and it's added to <code>.git/info/exclude</code> so it never pollutes <code>git status</code> (it falls back to the current directory if the repo isn't writable).
+  </p>
+  <p>
+    <strong>How agents consume it:</strong> load <code>index.md</code>, then hop between concepts via each file's <code>## Related</code> links (the KB is a navigable graph); grep <code>cite:</code> tokens to jump into source; use <code>manifest.yaml</code> to detect staleness — intersect <code>git diff --name-only</code> with each entry's <code>covers</code> globs (or compare <code>source_hashes</code>) and regenerate only the dirty files (the KB's <code>guides/maintain.md</code> spells this out for an agent). At the end of a run Dissector <strong>offers</strong> — with your confirmation — to append a one-line pointer to your repo's <code>CLAUDE.md</code>/<code>AGENTS.md</code> so agents auto-discover the map; that consented pointer is the only thing it writes outside the dissection folder.
   </p>
 </section>
 
@@ -1145,7 +1149,7 @@ chmod +x install.sh && ./install.sh
 <!-- FOOTER -->
 <footer>
   <p>
-    <strong>Dissector</strong> · v2.3.2 · Built for <a href="https://code.claude.com/docs">Claude Code</a>
+    <strong>Dissector</strong> · v2.4.0 · Built for <a href="https://code.claude.com/docs">Claude Code</a>
   </p>
   <p style="margin-top:8px;">
     <a href="https://github.com/SufficientDaikon/dissector-agent">GitHub</a> ·
