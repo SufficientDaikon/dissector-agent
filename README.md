@@ -8,9 +8,6 @@ Cited to the source line · greppable · diff-clean · kept in sync with the cod
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Multi--Agent_System-orange.svg)](https://code.claude.com/docs)
-[![OKF v0.1 compatible](https://img.shields.io/badge/OKF-v0.1_compatible-green.svg)](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
-[![Static analysis only](https://img.shields.io/badge/analysis-static_only-blue.svg)](#security--governance)
-[![7 specialist agents](https://img.shields.io/badge/agents-7_specialists-8b5cf6.svg)](#how-it-works)
 
 **[Quickstart](#quickstart) · [What you get](#what-you-get) · [How it works](#how-it-works) · [Reference](#reference)**
 
@@ -18,13 +15,13 @@ Cited to the source line · greppable · diff-clean · kept in sync with the cod
 
 ---
 
-Hand a repo to a coding agent and it re-reads the same files every session, guesses at the architecture, and misses the conventions. Dissector fixes that **once**: seven specialist subagents reverse-engineer the repo into a `{project}-dissection/` knowledge base — architecture, modules, APIs, conventions, patterns, tests, security, dependencies, build system — that any agent loads to understand the project *without re-scanning it*, extend it safely, or rebuild it from scratch.
+Hand a repo to a coding agent and it re-reads the same files every session, guesses at the architecture, and misses the conventions. Dissector fixes that **once**: seven specialist subagents reverse-engineer the repo into a `{project}-dissection/` knowledge base — architecture, modules, APIs, conventions, patterns, tests, security, dependencies, build system — that any agent — or engineer — loads to understand the project *without re-scanning it*: to navigate it, extend it, or rebuild it.
 
 Every claim is pinned to a real `path#Lstart-Lend` source line and machine-verified. The KB lives **inside the repo**, links back so agents auto-discover it, and ships a maintenance guide so it stays current as the code moves.
 
 ## Built for real work
 
-This isn't a demo. I use it to get productive in large, unfamiliar codebases *fast* — including my contributions to **[PowerShell](https://github.com/PowerShell/PowerShell)** (50k★). Dissector mapped the engine and docs so I could land a **merged** change making `New-Guid` emit sortable UUID v7 by default (and document it upstream), plus a stack of fixes under review — an 8-year-old `-WindowStyle Hidden` console bug, hosting-API timeouts, switch-parameter correctness, and static-analyzer findings. When an agent can load an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being what slows you down.
+**I used Dissector to ship a merged change to [PowerShell](https://github.com/PowerShell/PowerShell)** — a 50k★ codebase I'd never opened — making `New-Guid` emit sortable UUID v7 by default, then documented it upstream. A stack more is under review: an 8-year-old `-WindowStyle Hidden` console bug, hosting-API timeouts, switch-parameter correctness, static-analyzer findings. This isn't a demo — it's how I get productive in unfamiliar codebases *fast*. When an agent loads an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being what slows you down.
 
 <details>
 <summary><strong>📌 References — PowerShell contributions, mapped with Dissector</strong></summary>
@@ -78,6 +75,9 @@ A `{project}-dissection/` folder, written **inside the repo** (git-excluded so i
 
 At the end of a run Dissector offers (with your OK) to drop a one-line pointer in your repo's `CLAUDE.md`/`AGENTS.md`, so every agent that opens the repo finds the map.
 
+> [!NOTE]
+> **What it costs (measured).** A full dissection of a ~12k-LOC Python library (37 source files, Tier 1) on Sonnet ran in **~20 minutes** and **~630k tokens** across the seven agents — producing 19 cross-linked docs with **566/567 citations verified**. Cost scales with source size; above ~2,000 files it switches to a disclosed sample. Re-dissections are far cheaper: `manifest.yaml` flags exactly which docs went stale, so only those regenerate.
+
 ## How it works
 
 Seven agents, each with a fresh context window; the four middle specialists run in parallel. Each writes its own KB files and returns a tiny manifest, so the orchestrator stays small no matter how big the repo.
@@ -99,7 +99,7 @@ flowchart TD
     S4 --> KB[("{project}-dissection/")]
 ```
 
-## Why it's built for agents, not humans
+## What makes the output agent-grade
 
 - **Markdown + YAML** — the format every agent runtime already speaks (`llms.txt`, `AGENTS.md`, `CLAUDE.md`, OKF), far cheaper in tokens than JSON/XML, and it survives chunked reads, greps, and diffs.
 - **Cited** — every fact carries `cite: path#Lstart-Lend`, machine-verified each run (the manifest reports `N/M verified`).
