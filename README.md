@@ -24,15 +24,33 @@ Every claim is pinned to a real `path#Lstart-Lend` source line and machine-verif
 
 ## Built for real work
 
-This isn't a demo. I use it to get productive in large, unfamiliar codebases *fast* — including shipping well-scoped, high-quality pull requests to **[PowerShell](https://github.com/PowerShell/PowerShell)**, one of the biggest open-source .NET projects. When an agent can load an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being the thing that slows you down.
+This isn't a demo. I use it to get productive in large, unfamiliar codebases *fast* — including my contributions to **[PowerShell](https://github.com/PowerShell/PowerShell)** (50k★). Dissector mapped the engine and docs so I could land a **merged** change making `New-Guid` emit sortable UUID v7 by default (and document it upstream), plus a stack of fixes under review — an 8-year-old `-WindowStyle Hidden` console bug, hosting-API timeouts, switch-parameter correctness, and static-analyzer findings. When an agent can load an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being what slows you down.
 
 <details>
 <summary><strong>📌 References — high-quality PRs shipped with Dissector's help</strong></summary>
 
 <br>
 
-<!-- REFERENCES: fill in with real PowerShell PR links (title + URL) before publishing -->
-_PR list pending — links go here._
+Real contributions to a 50k★ codebase I didn't write — mapped with Dissector first.
+
+**[PowerShell/PowerShell](https://github.com/PowerShell/PowerShell)** — the engine
+
+| PR | Change | Status |
+|----|--------|--------|
+| [#27033](https://github.com/PowerShell/PowerShell/pull/27033) | `New-Guid` now emits sortable **UUID v7** by default (RFC 9562) | ✅ Merged |
+| [#27111](https://github.com/PowerShell/PowerShell/pull/27111) | Fix `-WindowStyle Hidden` console-window flash (an 8-year-old bug) | 🔄 Under review |
+| [#27027](https://github.com/PowerShell/PowerShell/pull/27027) | Bounded-wait **timeout** support for the hosting API (7 files) | 🔄 Under review |
+| [#27034](https://github.com/PowerShell/PowerShell/pull/27034) | Correct `-ListAvailable:$false` / `-Stack:$false` switch behavior | 🔄 Under review |
+| [#27035](https://github.com/PowerShell/PowerShell/pull/27035) | Fix 6 PVS-Studio static-analyzer findings | 🔄 Under review |
+| [#27078](https://github.com/PowerShell/PowerShell/pull/27078) | Fix the `get-changed-files` CI action for `schedule`/`workflow_dispatch` | 🔄 Under review |
+
+**[MicrosoftDocs/PowerShell-Docs](https://github.com/MicrosoftDocs/PowerShell-Docs)** — the docs
+
+| PR | Change | Status |
+|----|--------|--------|
+| [#12890](https://github.com/MicrosoftDocs/PowerShell-Docs/pull/12890) | Add `about_Error_Handling` + fix error terminology across the docs | ✅ Merged |
+| [#12888](https://github.com/MicrosoftDocs/PowerShell-Docs/pull/12888) | Document the `New-Guid` UUID v7 default change | ✅ Merged |
+| [#12949](https://github.com/MicrosoftDocs/PowerShell-Docs/pull/12949) | Overhaul the migration guide: phased playbook + 7 deep-dive articles | 🔄 Under review |
 
 </details>
 
