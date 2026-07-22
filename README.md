@@ -2,127 +2,134 @@
 
 # 🔬 Dissector
 
-**A Claude Code multi-agent system that reverse-engineers any codebase into an agent-optimized knowledge base.**
+**Point Claude Code at any codebase — get back a map its agents can actually use.**
+
+Cited to the source line · greppable · diff-clean · kept in sync with the code.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Multi--Agent_System-orange.svg)](https://code.claude.com/docs)
 [![OKF v0.1 compatible](https://img.shields.io/badge/OKF-v0.1_compatible-green.svg)](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
-[![Static analysis only](https://img.shields.io/badge/analysis-static_only-blue.svg)](#security)
+[![Static analysis only](https://img.shields.io/badge/analysis-static_only-blue.svg)](#security--governance)
 [![7 specialist agents](https://img.shields.io/badge/agents-7_specialists-8b5cf6.svg)](#how-it-works)
 
-**[Installation](#installation)** · **[Usage](#usage)** · **[Output format](#output-format)** · **[Security](#security)** · **[FAQ](#faq)**
+**[Quickstart](#quickstart) · [What you get](#what-you-get) · [How it works](#how-it-works) · [Reference](#reference)**
 
 </div>
 
-Point it at a repository and it produces a `{project}-dissection/` folder — a complete, machine-parseable map of the codebase (architecture, modules, APIs, conventions, patterns, tests, build system, dependencies) that another AI agent can load to understand the project without re-scanning it, extend it safely, rebuild it from scratch, or keep it maintained as the code evolves.
-
 ---
 
-## Why agent-optimized output?
+Hand a repo to a coding agent and it re-reads the same files every session, guesses at the architecture, and misses the conventions. Dissector fixes that **once**: seven specialist subagents reverse-engineer the repo into a `{project}-dissection/` knowledge base — architecture, modules, APIs, conventions, patterns, tests, security, dependencies, build system — that any agent loads to understand the project *without re-scanning it*, extend it safely, or rebuild it from scratch.
 
-Traditional generated docs are written for humans. Dissector's output is written for **agents**:
+Every claim is pinned to a real `path#Lstart-Lend` source line and machine-verified. The KB lives **inside the repo**, links back so agents auto-discover it, and ships a maintenance guide so it stays current as the code moves.
 
-- **Markdown + YAML frontmatter** — the format every agent runtime already navigates (the same convention as `llms.txt`, `AGENTS.md`, `CLAUDE.md`, `SKILL.md`), substantially cheaper in tokens than JSON or XML, and line-oriented so it survives chunked reads, greps cleanly, and git-diffs minimally.
-- **Progressive disclosure** — a small `index.md` root (always cheap to load) links to focused per-domain and per-module files, each 200–600 lines. Agents load only what they need.
-- **Navigable concept graph** — every KB file carries a `related:` frontmatter list and a `## Related` link section, so an agent hops concept→concept (a module → its API → the symbol map → architecture), not only through the `index.md` hub.
-- **Greppable citations** — every factual claim carries an own-line token like `cite: src/parser/index.ts#L18-L31 symbol: parse`, so `rg 'src/parser/'` over the KB finds every claim about a file.
-- **Deterministic and diffable** — sorted lists, stable path-derived IDs, volatile metadata confined to `manifest.yaml`. Regenerating from unchanged sources produces near-identical bytes.
-- **Staleness-aware** — `manifest.yaml` records which source globs each KB file covers plus content hashes, so after a code change you can compute exactly which KB files are dirty and regenerate only those.
-- **OKF-compatible** — a dissection is a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset), so any OKF-aware tool can ingest it.
+## Built for real work
+
+This isn't a demo. I use it to get productive in large, unfamiliar codebases *fast* — including shipping well-scoped, high-quality pull requests to **[PowerShell](https://github.com/PowerShell/PowerShell)**, one of the biggest open-source .NET projects. When an agent can load an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being the thing that slows you down.
+
+<details>
+<summary><strong>📌 References — high-quality PRs shipped with Dissector's help</strong></summary>
+
+<br>
+
+<!-- REFERENCES: fill in with real PowerShell PR links (title + URL) before publishing -->
+_PR list pending — links go here._
+
+</details>
+
+## Quickstart
+
+```text
+/plugin marketplace add SufficientDaikon/dissector-agent
+/plugin install dissector@dissector-marketplace
+/dissect /path/to/codebase
+```
+
+Or **zero-install**: clone this repo, open Claude Code inside it, and run `/dissect` — `.claude/` loads automatically. ([other install options ↓](#reference))
+
+> [!TIP]
+> Plugins don't auto-update. Pull new versions with `/plugin` → **Installed** → **dissector** → **Update**.
+
+## What you get
+
+A `{project}-dissection/` folder, written **inside the repo** (git-excluded so it never pollutes commits), that an agent reads like this:
+
+- **Load `index.md`** — a <200-line root map linking every doc.
+- **Hop the graph** — each file's `## Related` links connect concept→concept, not just through the hub.
+- **`grep cite:`** — jump from any claim straight to the exact source line.
+- **`manifest.yaml`** — coverage globs, verified-citation counts, and staleness data.
+
+At the end of a run Dissector offers (with your OK) to drop a one-line pointer in your repo's `CLAUDE.md`/`AGENTS.md`, so every agent that opens the repo finds the map.
 
 ## How it works
 
-Dissector is not one agent — it's an orchestrated system of seven. A monolithic prompt analyzing a whole codebase in one context window runs out of room; Dissector gives each analysis domain a fresh context window and runs the middle of the pipeline in parallel:
+Seven agents, each with a fresh context window; the four middle specialists run in parallel. Each writes its own KB files and returns a tiny manifest, so the orchestrator stays small no matter how big the repo.
 
 ```mermaid
 flowchart TD
-    U["/dissect PATH<br/>(or: claude --agent dissector)"] --> O["Orchestrator<br/>validates input · resolves project name · coordinates<br/>holds only briefs and manifests, never raw source"]
-    O --> S1["Stage 1 · dissection-scout<br/>discovery + structure"]
+    U["/dissect PATH"] --> O["Orchestrator<br/>validate · resolve name · coordinate"]
+    O --> S1["Stage 1 · scout<br/>discovery + structure"]
     S1 -. Recon Brief .-> G
-    subgraph G["Stage 2 · four specialists in parallel · disjoint output files"]
+    subgraph G["Stage 2 · four specialists in parallel"]
         direction LR
-        SA["stack-auditor<br/>tech stack · deps · build/CI"]
+        SA["stack-auditor<br/>stack · deps · build"]
         ST["style-analyst<br/>conventions · patterns"]
-        IN["interface-documenter<br/>APIs · symbol map · errors"]
-        QA["quality-auditor<br/>testing · security · performance"]
+        IN["interface-documenter<br/>APIs · symbols · errors"]
+        QA["quality-auditor<br/>testing · security · perf"]
     end
-    G --> S3["Stage 3 · dissection-synthesist<br/>guides · glossary · root index"]
-    S3 --> S4["Stage 4 · finalize<br/>manifest.yaml · cite verification · summary"]
+    G --> S3["Stage 3 · synthesist<br/>guides · glossary · index"]
+    S3 --> S4["Stage 4 · manifest · cite check · summary"]
     S4 --> KB[("{project}-dissection/")]
 ```
 
-Each specialist writes its knowledge-base files directly and returns only a compact manifest, so the orchestrator's context stays small no matter how big the target codebase is. The classic 13-phase Dissector methodology (discovery → structure → tech stack → conventions → patterns → APIs → testing → error handling → security & performance → dependencies → build system → synthesis → output) is preserved — redistributed across the specialists.
+## Why it's built for agents, not humans
 
-## What's included
+- **Markdown + YAML** — the format every agent runtime already speaks (`llms.txt`, `AGENTS.md`, `CLAUDE.md`, OKF), far cheaper in tokens than JSON/XML, and it survives chunked reads, greps, and diffs.
+- **Cited** — every fact carries `cite: path#Lstart-Lend`, machine-verified each run (the manifest reports `N/M verified`).
+- **Navigable graph** — `related:` frontmatter + `## Related` links tie the concepts together.
+- **Deterministic** — same code in, same bytes out; regeneration diffs cleanly.
+- **[OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 compatible** — a dissection is a valid Open Knowledge Format bundle, ingestible by any OKF-aware tool.
 
-| Component | File | Role |
-|---|---|---|
-| `/dissect` command | `.claude/commands/dissect.md` | Primary entry point |
-| `dissect` skill | `.claude/skills/dissect/SKILL.md` | The orchestration playbook |
-| `dissection-standards` skill | `.claude/skills/dissection-standards/SKILL.md` | Shared methodology + KB format spec, preloaded into every specialist |
-| `dissector` agent | `.claude/agents/dissector.md` | Orchestrator for `claude --agent dissector` |
-| 6 specialist agents | `.claude/agents/dissection-*.md` | Scout, stack auditor, style analyst, interface documenter, quality auditor, synthesist |
-| write-guard hook (plugin install) | `hooks/hooks.json` + `scripts/write-guard.sh` | `PreToolUse` guard shipped with the plugin: while a dissection run is active, agents may only write inside the `*-dissection/` output folder; inert otherwise |
-| plugin manifest | `.claude-plugin/plugin.json` + `marketplace.json` | Packages the above as an installable, self-hosted Claude Code plugin |
+## Reference
 
-## Installation
+<details>
+<summary><strong>Install options</strong></summary>
 
-**Preferred — Claude Code plugin (versioned, updatable in place, ships the write-guard hook):** from any Claude Code session,
+<br>
 
-```
+**Plugin (preferred)** — versioned, updatable in place, ships the write-guard hook:
+
+```text
 /plugin marketplace add SufficientDaikon/dissector-agent
 /plugin install dissector@dissector-marketplace
 ```
 
-This installs the seven agents, both skills, the `/dissect` command, and the `PreToolUse` write-guard hook (see [Security](#security)) as a semver-tagged bundle you can update in place. For a team, check the plugin into the repo's project settings so every collaborator gets it automatically.
+**Zero-install** — clone the repo and start Claude Code inside it; `.claude/` is picked up automatically. No install needed.
 
-> [!TIP]
-> Plugins don't auto-update. When a new version ships, pull it with `/plugin` → **Installed** → **dissector** → **Update** (details in the [FAQ](#faq)).
+**Script install** (offline / no-plugin) — copies agents, skills, and command into `~/.claude/`:
 
-**Zero-install (project-local):** clone this repo and start Claude Code inside it — the `.claude/` directory is picked up automatically and `/dissect` is available in that session. No plugin install needed.
-
-<details>
-<summary><strong>User-level script install</strong> — fallback for offline / no-plugin setups</summary>
-
-macOS/Linux:
 ```bash
-chmod +x install.sh && ./install.sh
+chmod +x install.sh && ./install.sh   # macOS/Linux
 ```
-
-Windows (PowerShell):
 ```powershell
-.\install.ps1
+.\install.ps1                          # Windows
 ```
 
-This copies the agents, skills, and command into `~/.claude/`. Prerequisite: the [Claude Code CLI](https://code.claude.com/docs).
+Both invocation paths: `/dissect /path/to/codebase` from any session, or `claude --agent dissector` for a dedicated run.
 
 </details>
 
-## Usage
+<details>
+<summary><strong>Output format</strong> — the KB tree, frontmatter, and OKF details</summary>
 
-Primary — from any Claude Code session:
+<br>
 
-```
-/dissect /path/to/codebase
-```
-
-Or a dedicated session:
-
-```bash
-claude --agent dissector
-```
-
-Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`). On a re-run against the same project, an existing dissection folder (identified by a `manifest.yaml` carrying `generator.name: dissector`) is overwritten after a warning; a same-named folder *without* that marker is never touched.
-
-## Output format
-
-```
-{project}-dissection/
-├── index.md                # START HERE — root map, <200 lines, links to everything
-├── manifest.yaml           # machine index: coverage globs, source hashes, status
-├── architecture.md         # module graph, layers, entry points, detected patterns
+```text
+{project}-dissection/            # created INSIDE the repo, git-excluded
+├── index.md                # START HERE — root map, links to everything
+├── manifest.yaml           # machine index: coverage globs, source hashes, cite counts, status
+├── architecture.md         # module graph, layers, entry points, patterns
 ├── symbol-map.md           # ranked signature map of exported symbols
-├── tech-stack.md           # languages, frameworks, tooling (YAML inventories)
+├── tech-stack.md           # languages, frameworks, tooling
 ├── dependencies.md         # every dependency: version, category, purpose
 ├── build-and-test.md       # commands, CI pipelines, deployment, env vars
 ├── conventions.md          # the implicit style guide, as rules with consistency %
@@ -136,77 +143,71 @@ Progress is reported with phase banners (`[Phase 3-11/13] Parallel analysis...`)
 ├── modules/<module-id>.md  # one file per module: purpose, files, exports, gotchas
 ├── api/<module-id>.md      # public API per module: signatures + citations
 └── guides/
-    ├── extend.md           # recipes: add a feature/endpoint/test, conventions to follow
+    ├── extend.md           # recipes: add a feature/endpoint/test
     ├── rebuild.md          # reconstruction map: build order, extension points, fork strategy
     └── maintain.md         # how an agent keeps this KB in sync as the code changes
 ```
 
-By default the folder is created **inside the dissected repo** (`<repo>/{project}-dissection/`), so the map lives with the code it maps. In a git repo it's added to `.git/info/exclude`, so it never shows in `git status` or gets committed by accident. If the repo isn't writable, Dissector falls back to your current directory and tells you.
+`<module-id>` = the source path with each `/` replaced by a double hyphen `--` (`src/parser` → `src--parser`), collision-safe for POSIX paths. Every file carries queryable YAML frontmatter (`type`, `id`, `title`, `description`, plus keys like `public_exports`, `covers`, `depends_on`, `related`) and closes with a `## Related` link section — the edges that make the KB a navigable graph.
 
-`<module-id>` is the module's source path with each `/` replaced by a double hyphen `--` (e.g. `src/parser` → `src--parser`, `packages/core/api` → `packages--core--api`). The double-hyphen scheme is collision-safe for POSIX paths — a single `/` never maps to a single `-`, so `src/foo-bar` and `src/foo/bar` never merge.
+**Placement:** created at `<repo>/{project}-dissection/` and added to `.git/info/exclude`, so it lives with the code but never shows in `git status`. Falls back to your current directory if the repo isn't writable.
 
-Every KB file carries queryable YAML frontmatter (`type`, `id`, `title`, `description`, plus type-specific keys like `public_exports`, `covers`, `depends_on`) and a sorted `related:` list of sibling concepts, and closes with a `## Related` section of markdown links to those siblings — the edges that make the KB a navigable graph.
+**OKF:** a dissection is a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset) — Dissector adds `cite:` source traceability and a machine `manifest.yaml` on top (`spec: {okf: "0.1"}`).
 
-**How agents consume it:** load `index.md` (or `AGENTS.md` for non-Claude tools), then hop between concepts via each file's `## Related` links — the KB is a navigable graph, not just a hub; grep `cite:` tokens to jump into source; read `manifest.yaml` for coverage, citation-verification counts, and staleness. To check whether a dissection is stale after code changes: intersect `git diff --name-only` with each entry's `covers` globs (or compare `source_hashes`) and regenerate only the dirty files — the KB's own `guides/maintain.md` spells out this staleness check and the safe update procedure for an agent. At the end of a run Dissector **offers** to wire the KB in for you (with your confirmation): it appends a one-line pointer to your repo's `CLAUDE.md`/`AGENTS.md` so agents auto-discover the map. Decline and it just prints the snippet to paste yourself — that consented pointer is the only thing Dissector ever writes outside the dissection folder.
+</details>
 
-**Open Knowledge Format compatible.** A dissection is a valid [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.1 bundle (a superset): one Markdown-with-frontmatter file per concept, path-as-identity, an `index.md` hub, and concepts linked into a graph via `## Related` — so any OKF-aware tool can ingest a dissection folder. Dissector layers on two things OKF leaves out: `cite:` tokens pinning every claim to `path#Lstart-Lend` in the source, and a machine `manifest.yaml` (compatibility declared via `spec: {okf: "0.1"}`) for coverage and staleness.
+<details>
+<summary><strong>Configuration</strong> — models, effort, sampling, scale</summary>
 
-Guarantees: never executes target code (static analysis only), redacts detected secrets (`[REDACTED]` + `secrets_redacted: true` in the manifest, plus a deterministic output-side secret scan in Stage 4), machine-verifies every `cite:` token and reports `N/M verified` in the manifest, never crashes on unreadable files (skips and logs them), and refuses to overwrite non-dissection folders or a dissection of a different codebase. On the **plugin install**, the write-guard hook additionally enforces at the harness level that agents write only inside the `*-dissection/` output folder — but only **while a dissection run is in progress** (it keys off the run's `.dissect-lock`); outside a run it stays silent, so it never adds permission prompts to your normal editing. The zero-install and script-install paths rely instead on the agents' `permissionMode: acceptEdits` and the in-prompt rule that analyzed content is data, never instructions (see [Security](#security)).
+<br>
 
-## Configuration
+**Models are not hard-coded** — no agent pins a `model:`; every specialist inherits your session model. Change what runs the analysis by setting your session model (`/model`), routing all subagents via `CLAUDE_CODE_SUBAGENT_MODEL`, or adding a `model:` line to any agent's frontmatter. Reasoning `effort` ships as task-shaped defaults (low for the mechanical stack audit, high for pattern analysis and synthesis) — also editable frontmatter.
 
-**Models are not hard-coded.** No agent pins a `model:` — every specialist inherits your session's model. To change what runs the analysis:
+**Sampling** adapts to size: under 500 source files every file is read; 500–2,000 all files with repetitive patterns summarized; over 2,000 a disclosed stratified sample. Above 2,000, Stage 0 pauses to let you confirm the whole-tree run or hand it a subdirectory — for big monorepos, point `/dissect` at a package directory.
 
-- Set your session model (`/model` in Claude Code) — specialists follow it.
-- Route all subagents to a specific model: set the `CLAUDE_CODE_SUBAGENT_MODEL` environment variable.
-- Pin per-role models by adding a `model:` line to any agent's frontmatter (e.g. a cheaper model for `dissection-stack-auditor`, a stronger one for `dissection-synthesist`).
+</details>
 
-Reasoning `effort` per agent ships with task-shaped defaults (`low` for the mechanical stack audit, `high` for pattern analysis and synthesis) — also just frontmatter, edit freely.
+<details>
+<summary><strong>Security &amp; governance</strong></summary>
 
-Sampling adapts automatically to codebase size: under 500 source files every file is read; 500–2,000 everything is read with repetitive patterns summarized; over 2,000 a stratified sample (all entry points/configs/APIs/tests exhaustively, proportional sampling elsewhere) is used and disclosed in `index.md` and `manifest.yaml`.
+<br>
 
-**Scale envelope.** Dissector is tested on small and medium repositories (under ~2,000 source files). Tier-3 stratified sampling engages above 2,000 source files — the KB becomes a disclosed sample, not an exhaustive map. Very large monorepos should be dissected **per-package**: point `/dissect` at a package directory rather than the monorepo root. At Stage 0, Dissector prints the source-file count and a rough token estimate, and above 2,000 source files it pauses to let you confirm the whole-tree run or hand it a subdirectory instead.
-
-## Data flow
-
-> [!NOTE]
-> There is no Dissector server, telemetry, or third-party call — everything runs through **your** configured Claude Code backend, and the generated KB stays on local disk.
-
-Dissector runs entirely through **your configured Claude Code backend** — the Anthropic API, Amazon Bedrock, or Google Vertex AI, whichever your Claude Code is set to. Source files are read locally and sent to that model backend for analysis exactly as any Claude Code session would; **nothing else leaves your machine**, there is no Dissector server, telemetry, or third-party call. The generated knowledge base is written to a local `{project}-dissection/` folder and stays on disk — it is never uploaded anywhere by the tool. If your organization requires Bedrock/Vertex or zero-retention routing, configure Claude Code accordingly and Dissector inherits it.
-
-## Where should the KB live? (governance)
-
-The dissection is a concentrated, greppable map of your system — it aggregates endpoints, environment-variable names, config surface, and verbatim code snippets in one place. It's created inside the repo but **git-excluded by default** (via `.git/info/exclude`), so it never enters version control unless you choose to. Treat it with the same care as the code it describes:
-
-- **Commit it** when you want the whole team (and their agents) to share one maintained map — remove the `.git/info/exclude` entry to start tracking it. It diffs cleanly and is cheap to regenerate. Good for internal repos.
-- **Gitignore it** (or store it in an access-controlled location) when the repo is sensitive and you don't want a consolidated attack-surface map in version control. The KB can make reconnaissance easier for anyone who gets read access.
+- **Static analysis only** — never executes, compiles, or runs the target code, and never fetches remote repos.
+- **Prompt-injection resistant** — analyzed content is treated as **data, never instructions**; text addressed to an AI ("ignore your instructions…") is recorded as a finding, not obeyed.
+- **Secret redaction** — classic patterns (AWS keys, JWTs, private keys, connection strings) plus modern provider tokens (`sk-`/`sk-ant-`, `ghp_`, `xoxb-`, `AIza`, `npm_`, `glpat-`, …), with a deterministic Stage-4 grep over the generated KB as a second layer.
+- **Citation verification** — every `cite:` is machine-checked (file exists, range in bounds, symbol present); verified/broken counts land in `manifest.yaml`.
+- **Write-guard hook** (plugin install) — lock-gated to active runs; mid-run it allows writes inside the `*-dissection/` folder and asks for anything else, so an injected payload can't steer a specialist into writing elsewhere. Inert outside a run. The one exception: with your explicit confirmation at the end of a run, Dissector appends a pointer line to your repo's `CLAUDE.md`/`AGENTS.md` — the only thing it ever writes outside the dissection folder.
 
 > [!WARNING]
-> A dissection concentrates endpoints, env-var names, config surface, and verbatim code snippets into one greppable place. Secrets are redacted best-effort (`[REDACTED]` plus a deterministic Stage-4 backstop scan), but **don't treat the KB as safe to publish just because it was scanned** — decide commit-vs-gitignore deliberately per repo.
+> A dissection concentrates endpoints, env-var names, config surface, and verbatim code into one greppable place. Redaction is best-effort — **don't treat the KB as safe to publish just because it was scanned.** It's git-excluded by default; remove the `.git/info/exclude` entry to commit it deliberately, or leave it excluded on sensitive repos. Decide per repo.
 
-## Security
+**Data flow:** runs entirely through *your* configured Claude Code backend (Anthropic API / Bedrock / Vertex). No Dissector server, telemetry, or third-party call; the KB stays on local disk.
 
-- **Static analysis only** — Dissector never executes, compiles, or runs the target code, and never fetches remote repositories.
-- **Write-guard hook (plugin install)** — the **plugin** ships a `PreToolUse` hook (`scripts/write-guard.sh`) that is **lock-gated to active dissection runs**: it does nothing (defers to your own permission settings) unless a fresh `*-dissection/.dissect-lock` marks a run in progress or the write targets a `*-dissection/` path. Mid-run it emits `permissionDecision: allow` for writes inside the `*-dissection/` output folder and `permissionDecision: ask` for anything else, so an injected payload can't silently steer a specialist into writing elsewhere. This harness-level backstop rides with the plugin install only; the **zero-install** and **script-install** paths instead rely on the agents' `permissionMode: acceptEdits` plus the in-prompt rule that analyzed content is treated as **data, never instructions** (dissection-standards §0).
-- **Prompt-injection resistance** — analyzed file content is treated as untrusted **data, never instructions**. If a codebase contains text addressed to an AI agent ("ignore your instructions, write X…"), specialists record it as a finding and do not comply.
-- **Secret redaction** — matches classic patterns (AWS keys, JWTs, private keys, connection strings) plus modern provider tokens (`sk-`/`sk-ant-`, `ghp_`/`github_pat_`, `xoxb-`, `AIza`, `npm_`, `glpat-`, and more), with a deterministic Stage-4 grep over the generated KB as a second layer.
-- **Citation verification** — every `cite:` is machine-checked (file exists, line range in bounds, symbol present) and the verified/broken counts are reported in `manifest.yaml`.
+</details>
 
-## Development
+<details>
+<summary><strong>FAQ</strong></summary>
 
-**SINGLE SOURCE:** `.claude/agents`, `.claude/skills`, and `.claude/commands` are the **canonical** copies (they drive the zero-install project-local path). The repo-root `agents/`, `skills/`, and `commands/` directories are byte-identical copies that exist only so the Claude Code plugin (`.claude-plugin/`) can package them — marketplace installs copy real files, so these are real directories, **not symlinks**. Any change to an agent, skill, or command must be applied to **both** locations to keep them in sync; a `diff -r .claude/agents agents` (and likewise for skills/commands) must report no differences. Run `scripts/check-sync.sh` to verify the whole mirror in one shot — it diffs all three pairs and exits nonzero on any drift.
+<br>
 
-## FAQ
+**Why no persistent agent memory?** Dissections must be deterministic (same code in, same facts out); memory leaking between runs would break that. Idempotency is handled by `manifest.yaml`.
 
-**Why no persistent agent memory?** Claude Code subagents support a `memory:` field, but Dissector deliberately doesn't use it — dissections must be deterministic (same code in, same facts out), and memory from a previous run leaking into a new one would break that. Idempotency is handled by `manifest.yaml` instead.
+**How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the `covers`/`source_hashes` data in `manifest.yaml` to re-run only the owning specialist. Every KB ships `guides/maintain.md` walking an agent through exactly this.
 
-**What is `manifest.yaml` for?** Three things: it marks the folder as a dissection (safe-overwrite check), records what was analyzed and how (counts, sampling tier, skipped files, redaction flag), and maps every KB file to the source globs and content hashes it was derived from (staleness detection).
+**How do I update the installed plugin?** Plugins don't self-update — run `/plugin` → **Installed** → **dissector** → **Update**. If a version misbehaves, **Disable** it there without uninstalling.
 
-**A specialist failed mid-run — now what?** The run continues; the result is marked partial (`status.complete: false` in the manifest, a completion checklist in `index.md`) and the summary tells you which specialist to re-run. Re-running `/dissect` regenerates the whole dissection.
+**A specialist failed mid-run?** The run continues and is marked partial (`status.complete: false`, a checklist in `index.md`); the summary says which specialist to re-run.
 
-**How do I update a dissection after the code changed?** Re-run `/dissect` (cheap for small/medium repos), or use the staleness data in `manifest.yaml` to identify dirty files and ask Claude to re-run just the owning specialist. Every KB ships a `guides/maintain.md` that walks an agent through exactly this — detecting stale docs via `covers`/`source_hashes` and updating them without breaking the citation/format contract.
+</details>
 
-**How do I update the installed plugin when a new version ships?** Plugins don't self-update — your install stays on whatever version you first pulled until you act. In any Claude Code session run `/plugin` → **Installed** → **dissector** → **Update** (or `/plugin marketplace update SufficientDaikon/dissector-agent`, then reinstall). If a version ever misbehaves, `/plugin` → **Installed** → **dissector** → **Disable** turns it off without uninstalling.
+<details>
+<summary><strong>Development</strong></summary>
+
+<br>
+
+`.claude/{agents,skills,commands}` are the **canonical** copies (they drive the zero-install path); the repo-root `agents/`, `skills/`, `commands/` are byte-identical copies the plugin packages. Any change must go to **both** — run `scripts/check-sync.sh` (a `diff -r` of all three pairs) to verify no drift.
+
+</details>
 
 ## License
 
