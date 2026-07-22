@@ -27,7 +27,7 @@ Every claim is pinned to a real `path#Lstart-Lend` source line and machine-verif
 This isn't a demo. I use it to get productive in large, unfamiliar codebases *fast* — including my contributions to **[PowerShell](https://github.com/PowerShell/PowerShell)** (50k★). Dissector mapped the engine and docs so I could land a **merged** change making `New-Guid` emit sortable UUID v7 by default (and document it upstream), plus a stack of fixes under review — an 8-year-old `-WindowStyle Hidden` console bug, hosting-API timeouts, switch-parameter correctness, and static-analyzer findings. When an agent can load an accurate, cited map of a huge repo in seconds, "I don't know this codebase yet" stops being what slows you down.
 
 <details>
-<summary><strong>📌 References — high-quality PRs shipped with Dissector's help</strong></summary>
+<summary><strong>📌 References — PowerShell contributions, mapped with Dissector</strong></summary>
 
 <br>
 
